@@ -17,16 +17,35 @@ import 'package:riyobox/presentation/screens/video_player_screen.dart';
 import 'package:riyobox/presentation/screens/settings_screen.dart';
 import 'package:riyobox/presentation/screens/profile_screen.dart';
 import 'package:riyobox/presentation/screens/cast_screen.dart';
+import 'package:riyobox/presentation/screens/about_screen.dart';
+import 'package:riyobox/presentation/screens/support_screen.dart';
 import 'package:riyobox/presentation/screens/categories_screen.dart';
 import 'package:riyobox/presentation/screens/downloads_screen.dart';
 import 'package:riyobox/presentation/screens/my_riyobox_screen.dart';
 import 'package:riyobox/presentation/screens/search_screen.dart';
 import 'package:riyobox/presentation/screens/genre_movies_screen.dart';
 import 'package:riyobox/presentation/screens/admin/admin_panel_screen.dart';
+import 'package:riyobox/presentation/screens/sports_screen.dart';
+import 'package:riyobox/presentation/screens/profile_selection_screen.dart';
+import 'package:riyobox/providers/football_provider.dart';
+
+import 'package:firebase_core/firebase_core.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const MyApp());
+
+  bool firebaseInitialized = false;
+  try {
+    // Basic Firebase initialization with timeout
+    await Firebase.initializeApp().timeout(const Duration(seconds: 5));
+    firebaseInitialized = true;
+    debugPrint('✅ Firebase initialized successfully');
+  } catch (e) {
+    debugPrint('❌ Firebase initialization failed: $e');
+    firebaseInitialized = false;
+  }
+
+  runApp(MyApp(firebaseInitialized: firebaseInitialized));
 }
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -53,8 +72,17 @@ GoRouter _createRouter(AuthProvider authProvider) {
         return (loggingIn || signingUp || welcome) ? null : '/login';
       }
 
+      // Check for email verification (optional production requirement)
+      // if (FirebaseAuth.instance.currentUser != null && !FirebaseAuth.instance.currentUser!.emailVerified) {
+      //   return '/verify-email';
+      // }
+
+      if (authProvider.isAuthenticated && authProvider.activeProfile == null && state.uri.path != '/profiles') {
+        return '/profiles';
+      }
+
       if (loggingIn || signingUp || welcome) {
-        return '/home';
+        return (authProvider.activeProfile == null) ? '/profiles' : '/home';
       }
 
       return null;
@@ -75,6 +103,10 @@ GoRouter _createRouter(AuthProvider authProvider) {
       GoRoute(
         path: '/signup',
         builder: (context, state) => const SignUpScreen(),
+      ),
+      GoRoute(
+        path: '/profiles',
+        builder: (context, state) => const ProfileSelectionScreen(),
       ),
       ShellRoute(
         navigatorKey: _shellNavigatorKey,
@@ -109,6 +141,10 @@ GoRouter _createRouter(AuthProvider authProvider) {
               return GenreMoviesScreen(genreName: name);
             },
           ),
+          GoRoute(
+            path: '/sports',
+            builder: (context, state) => const SportsScreen(),
+          ),
         ],
       ),
       GoRoute(
@@ -142,6 +178,16 @@ GoRouter _createRouter(AuthProvider authProvider) {
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const CastScreen(),
       ),
+      GoRoute(
+        path: '/about',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const AboutScreen(),
+      ),
+      GoRoute(
+        path: '/support',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const SupportScreen(),
+      ),
     GoRoute(
       path: '/admin',
       parentNavigatorKey: _rootNavigatorKey,
@@ -152,7 +198,8 @@ GoRouter _createRouter(AuthProvider authProvider) {
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final bool firebaseInitialized;
+  const MyApp({super.key, required this.firebaseInitialized});
 
   @override
   Widget build(BuildContext context) {
@@ -162,18 +209,26 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => PlaybackProvider()),
         ChangeNotifierProvider(create: (_) => DownloadProvider()),
         ChangeNotifierProvider(create: (_) => CastService()),
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => AuthProvider(firebaseInitialized)),
+        ChangeNotifierProvider(create: (_) => FootballProvider()),
       ],
       child: Consumer2<SettingsProvider, AuthProvider>(
         builder: (context, settings, auth, child) {
+          final playback = Provider.of<PlaybackProvider>(context, listen: false);
+          playback.updateToken(auth.token);
+          if (auth.activeProfile != null) {
+            playback.loadFromProfile(auth.activeProfile!['watchHistory']);
+          }
+
           return MaterialApp.router(
             routerConfig: _createRouter(auth),
             title: 'RIYOBOX',
             locale: settings.language == 'Arabic' ? const Locale('ar', '') : const Locale('en', ''),
             builder: (context, child) {
+              if (child == null) return const SizedBox.shrink();
               return Directionality(
                 textDirection: settings.language == 'Arabic' ? TextDirection.rtl : TextDirection.ltr,
-                child: child!,
+                child: child,
               );
             },
             theme: ThemeData.dark().copyWith(

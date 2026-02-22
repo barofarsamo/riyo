@@ -19,6 +19,7 @@ class CategoriesScreen extends StatelessWidget {
       {'name': 'Romance', 'image': 'https://picsum.photos/seed/romance/400/200'},
       {'name': 'Anime', 'image': 'https://picsum.photos/seed/anime/400/200'},
       {'name': 'Documentary', 'image': 'https://picsum.photos/seed/documentary/400/200'},
+      {'name': 'Sports', 'image': 'https://picsum.photos/seed/sports/400/200'},
     ];
 
     return Scaffold(
@@ -75,6 +76,51 @@ class CategoriesScreen extends StatelessWidget {
               child: _buildFeaturedCategoryCard(context),
             ),
           ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('SPORTS', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+                  const SizedBox(height: 12),
+                  InkWell(
+                    onTap: () => context.push('/sports'),
+                    child: Container(
+                      height: 100,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        image: const DecorationImage(
+                          image: NetworkImage('https://picsum.photos/seed/sports_banner/800/200'),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          gradient: LinearGradient(
+                            colors: [Colors.black.withAlpha(153), Colors.transparent],
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                          ),
+                        ),
+                        padding: const EdgeInsets.all(16),
+                        alignment: Alignment.centerLeft,
+                        child: const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('LIVE FOOTBALL', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                            Text('Scores, Standings & Stats', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           const SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
@@ -95,9 +141,13 @@ class CategoriesScreen extends StatelessWidget {
                   final genre = genres[index]['name']!;
                   return InkWell(
                     onTap: () {
-                      // Navigate to a screen showing movies of this genre
-                      // For now, we reuse search or a new route
-                      context.push('/genre/$genre');
+                      if (genre == 'Sports') {
+                        context.push('/sports');
+                      } else {
+                        // Navigate to a screen showing movies of this genre
+                        // For now, we reuse search or a new route
+                        context.push('/genre/$genre');
+                      }
                     },
                     child: _buildGenreCard(genre, genres[index]['image']!),
                   );
@@ -119,7 +169,7 @@ class CategoriesScreen extends StatelessWidget {
         alignment: Alignment.bottomLeft,
         children: [
           Image.network(
-            'https://picsum.photos/seed/van/800/400',
+            'https://picsum.photos/seed/football/800/400',
             height: 180,
             width: double.infinity,
             fit: BoxFit.cover,
@@ -140,12 +190,12 @@ class CategoriesScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('FEATURED CATEGORY', style: TextStyle(color: Colors.deepPurpleAccent, fontSize: 11, fontWeight: FontWeight.bold)),
+                const Text('FEATURED CATEGORY', style: TextStyle(color: Colors.yellowAccent, fontSize: 11, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                const Text('ANIME HUB', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                const Text('SPORTS HUB', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
                 ElevatedButton(
-                  onPressed: () {},
+                  onPressed: () => context.push('/sports'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),

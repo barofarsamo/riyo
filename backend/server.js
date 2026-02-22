@@ -1,10 +1,13 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 const dotenv = require('dotenv');
+const { initializeFirebase } = require('./utils/firebase');
 const User = require('./models/User');
 
 dotenv.config();
+initializeFirebase();
 
 // Validate Environment Variables
 const requiredEnvVars = [
@@ -12,7 +15,8 @@ const requiredEnvVars = [
   'JWT_SECRET',
   'R2_ACCESS_KEY_ID',
   'R2_SECRET_ACCESS_KEY',
-  'R2_BUCKET_NAME'
+  'R2_BUCKET_NAME',
+  'FOOTBALL_API_KEY'
 ];
 
 const validateEnv = () => {
@@ -29,6 +33,14 @@ validateEnv();
 const app = express();
 app.use(express.json());
 
+// Rate Limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again after 15 minutes'
+});
+app.use('/auth/', limiter); // Apply limiter only to auth routes
+
 // Enable CORS for all origins
 app.use(cors({
   origin: '*',
@@ -41,15 +53,19 @@ app.use('/admin', require('./routes/admin'));
 app.use('/movies', require('./routes/movies'));
 app.use('/users', require('./routes/users'));
 app.use('/upload', require('./routes/upload'));
+app.use('/sports', require('./routes/sports'));
 
 app.get('/', (req, res) => {
   const r2Configured = !!(process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY && process.env.R2_BUCKET_NAME);
+  const { admin } = require('./utils/firebase');
+  const firebaseStatus = admin.apps.length > 0 ? 'Initialized' : 'Mock Mode (Dev Only)';
 
   res.json({
     message: 'Riyobox API is running...',
     status: 'Operational',
     database: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected',
     storage: r2Configured ? 'R2 Configured' : 'R2 Missing Configuration',
+    firebase: firebaseStatus,
     timestamp: new Date().toISOString()
   });
 });

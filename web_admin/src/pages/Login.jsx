@@ -4,6 +4,7 @@ import api from '../utils/api';
 const Login = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -12,15 +13,33 @@ const Login = ({ onLogin }) => {
     setLoading(true);
     setError('');
     try {
-      const response = await api.post('/auth/login', { email, password });
-      if (response.data.role !== 'admin') {
-        setError('Unauthorized: Only admins can access this panel.');
-        setLoading(false);
-        return;
+      const response = await api.post('/auth/admin/login', {
+        email,
+        password,
+        rememberMe
+      });
+
+      const { token, refreshToken, role, ...user } = response.data;
+
+      // Store tokens and user
+      if (rememberMe) {
+        localStorage.setItem('adminToken', token);
+        localStorage.setItem('adminRefreshToken', refreshToken);
+        localStorage.setItem('adminUser', JSON.stringify(user));
+        localStorage.setItem('role', role);
+      } else {
+        sessionStorage.setItem('adminToken', token);
+        sessionStorage.setItem('adminUser', JSON.stringify(user));
+        sessionStorage.setItem('role', role);
       }
-      onLogin(response.data.token, response.data.role);
+
+      onLogin(token, role);
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed. Please try again.');
+      console.error(err);
+      const message = err.response?.data?.message || 'Login failed. Check credentials.';
+      const attemptsLeft = err.response?.data?.attemptsLeft;
+
+      setError(attemptsLeft !== undefined ? `${message}. ${attemptsLeft} attempts remaining.` : message);
     } finally {
       setLoading(false);
     }
@@ -42,9 +61,9 @@ const Login = ({ onLogin }) => {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-2">Email Address</label>
+            <label className="block text-sm font-medium text-gray-400 mb-2">Admin Email or Username</label>
             <input
-              type="email"
+              type="text"
               required
               className="w-full bg-[#262626] border border-white/10 rounded px-4 py-3 focus:outline-none focus:border-purple-500 transition-colors"
               placeholder="admin@example.com"
@@ -65,6 +84,22 @@ const Login = ({ onLogin }) => {
             />
           </div>
 
+          <div className="flex items-center justify-between">
+            <label className="flex items-center text-sm text-gray-400 cursor-pointer group">
+              <input
+                type="checkbox"
+                className="hidden"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+              />
+              <div className={`w-4 h-4 rounded border border-white/20 mr-2 flex items-center justify-center transition-colors ${rememberMe ? 'bg-purple-600 border-purple-600' : 'group-hover:border-purple-500'}`}>
+                {rememberMe && <div className="w-2 h-2 bg-white rounded-full" />}
+              </div>
+              Remember me
+            </label>
+            <a href="#" className="text-sm text-purple-500 hover:text-purple-400 transition-colors">Forgot Password?</a>
+          </div>
+
           <button
             type="submit"
             disabled={loading}
@@ -75,7 +110,7 @@ const Login = ({ onLogin }) => {
         </form>
 
         <p className="mt-8 text-center text-xs text-gray-500">
-          Secure access only. Unauthorized attempts are logged.
+          Secure access only. Secure JWT & Multi-Role Authentication.
         </p>
       </div>
     </div>

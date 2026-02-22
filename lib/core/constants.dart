@@ -9,4 +9,5 @@ class Constants {
   // TMDB (Optional fallback)
   static const String tmdbApiKey = 'YOUR_API_KEY';
   static const String tmdbBaseUrl = 'https://api.themoviedb.org/3';
+
 }
