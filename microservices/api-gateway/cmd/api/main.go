@@ -33,8 +33,14 @@ func main() {
 		v1.Use(middleware.AuthMiddleware(fbClient, cfg.InternalSecret))
 	}
 
-	// User Service Proxy
+	// Microservices Proxies
 	v1.Any("/users/*proxyPath", handler.ProxyHandler(cfg.UserServiceURL))
+	v1.Any("/metadata/*proxyPath", handler.ProxyHandler(cfg.MetadataServiceURL))
+	v1.Any("/auth-stream/*proxyPath", handler.ProxyHandler(cfg.StreamingAuthURL))
+	v1.Any("/notifications/*proxyPath", handler.ProxyHandler(cfg.NotificationServiceURL))
+
+	// Legacy Node.js CMS Proxy
+	v1.Any("/cms/*proxyPath", handler.ProxyHandler(cfg.NodeJsServiceURL))
 
 	log.Printf("API Gateway starting on port %s", cfg.Port)
 	r.Run(":" + cfg.Port)
