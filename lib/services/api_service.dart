@@ -1,31 +1,52 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:riyobox/models/movie.dart';
-import 'package:riyobox/core/constants.dart';
+import 'package:riyo/models/movie.dart';
+import 'package:riyo/core/constants.dart';
 
 class ApiService {
   static const String _apiKey = Constants.tmdbApiKey;
   static const String _baseUrl = Constants.tmdbBaseUrl;
   static const String _backendUrl = Constants.apiBaseUrl;
 
+  // Simple In-memory cache
+  static final Map<String, dynamic> _cache = {};
+  static final Map<String, DateTime> _cacheTime = {};
+  static const _cacheDuration = Duration(minutes: 5);
+
   bool get _isMock => _apiKey == 'YOUR_API_KEY';
 
-  Future<List<Movie>> getTrendingMovies({String? token, String? genre}) async {
+  Future<List<Movie>> getTrendingMovies(
+      {String? token, String? genre, bool isFeatured = false}) async {
+    final cacheKey = 'trending_${genre}_$isFeatured';
+    if (_isCacheValid(cacheKey)) {
+      return _cache[cacheKey] as List<Movie>;
+    }
+
     try {
       if (token != null) {
         String url = '$_backendUrl/movies';
-        if (genre != null) url += '?genre=$genre';
+        final List<String> params = [];
+        if (genre != null) params.add('genre=$genre');
+        if (isFeatured) params.add('isFeatured=true');
 
-        final response = await http.get(Uri.parse(url), headers: {'Authorization': 'Bearer $token'}).timeout(const Duration(seconds: 15));
+        if (params.isNotEmpty) {
+          url += '?${params.join('&')}';
+        }
+
+        final response = await http.get(Uri.parse(url),
+            headers: {'Authorization': 'Bearer $token'}).timeout(
+            const Duration(seconds: 15));
         if (response.statusCode == 200) {
-          final List<dynamic> results = json.decode(response.body);
-          return results.map((json) => Movie.fromJson(json)).toList();
+          final List<Movie> results = await compute(_parseMovies, response.body);
+          _setCache(cacheKey, results);
+          return results;
         }
       }
     } catch (e) {
-      print('Error fetching from backend: $e');
+      debugPrint('Error fetching from backend: $e');
       if (e.toString().contains('SocketException')) {
-        print('Backend connection failed. Is the server running?');
+        debugPrint('Backend connection failed. Is the server running?');
       }
     }
     if (_isMock) return _getMockMovies();
@@ -33,15 +54,25 @@ class ApiService {
   }
 
   Future<List<Movie>> getTopRatedMovies({String? token}) async {
+    const cacheKey = 'top_rated';
+    if (_isCacheValid(cacheKey)) return _cache[cacheKey] as List<Movie>;
+
     if (token != null) return getTrendingMovies(token: token);
     if (_isMock) return _getMockMovies();
-    return _fetchMovies('/movie/top_rated');
+    final results = await _fetchMovies('/movie/top_rated');
+    _setCache(cacheKey, results);
+    return results;
   }
 
   Future<List<Movie>> getNowPlayingMovies({String? token}) async {
+    const cacheKey = 'now_playing';
+    if (_isCacheValid(cacheKey)) return _cache[cacheKey] as List<Movie>;
+
     if (token != null) return getTrendingMovies(token: token);
     if (_isMock) return _getMockMovies();
-    return _fetchMovies('/movie/now_playing');
+    final results = await _fetchMovies('/movie/now_playing');
+    _setCache(cacheKey, results);
+    return results;
   }
 
   Future<Movie> getMovieDetails(String movieId, {String? token}) async {
@@ -50,7 +81,7 @@ class ApiService {
         final response = await http.get(Uri.parse('$_backendUrl/movies/$movieId'), headers: {'Authorization': 'Bearer $token'});
         if (response.statusCode == 200) return Movie.fromJson(json.decode(response.body));
       }
-    } catch (e) { print('Error fetching movie details from backend: $e'); }
+    } catch (e) { debugPrint('Error fetching movie details from backend: $e'); }
     if (_isMock) {
       final movies = await _getMockMovies();
       final movie = movies.firstWhere((m) => m.id.toString() == movieId,
@@ -124,12 +155,35 @@ class ApiService {
         await http.get(Uri.parse('$_baseUrl$url?api_key=$_apiKey'));
 
     if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      final List<dynamic> results = data['results'];
-      return results.map((json) => Movie.fromJson(json)).toList();
+      return await compute(_parseMovies, response.body);
     } else {
       throw Exception('Failed to load movies');
     }
+  }
+
+  static List<Movie> _parseMovies(String responseBody) {
+    final data = json.decode(responseBody);
+    final List<dynamic> results = (data is List)
+        ? data
+        : (data['movies'] ?? data['results'] ?? []);
+    return results.map((json) => Movie.fromJson(json)).toList();
+  }
+
+  bool _isCacheValid(String key) {
+    if (!_cache.containsKey(key)) return false;
+    final time = _cacheTime[key];
+    if (time == null) return false;
+    if (DateTime.now().difference(time) > _cacheDuration) {
+      _cache.remove(key);
+      _cacheTime.remove(key);
+      return false;
+    }
+    return true;
+  }
+
+  void _setCache(String key, dynamic value) {
+    _cache[key] = value;
+    _cacheTime[key] = DateTime.now();
   }
 
   Future<List<Movie>> _getMockMovies() async {
@@ -158,7 +212,7 @@ class ApiService {
         return data['isAdded'];
       }
     } catch (e) {
-      print('Error toggling watchlist: $e');
+      debugPrint('Error toggling watchlist: $e');
     }
     return false;
   }
@@ -175,8 +229,72 @@ class ApiService {
         return watchlist.map((json) => Movie.fromJson(json)).toList();
       }
     } catch (e) {
-      print('Error fetching watchlist: $e');
+      debugPrint('Error fetching watchlist: $e');
     }
     return [];
+  }
+
+  Future<List<String>> getHeaderCategories() async {
+    try {
+      final response = await http.get(Uri.parse('$_backendUrl/config/categories'));
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.map((cat) => cat['name'].toString()).toList();
+      }
+    } catch (e) {
+       debugPrint('Error: $e');
+    }
+    return ["All", "Movies", "TV Shows", "Anime", "Kids", "My List"]; // Fallback
+  }
+
+  Future<List<Map<String, dynamic>>> getHomeSections() async {
+    try {
+      final response = await http.get(Uri.parse('$_backendUrl/config/home-sections'));
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return List<Map<String, dynamic>>.from(data);
+      }
+    } catch (e) {
+       debugPrint('Error: $e');
+    }
+    return [
+      {'title': 'Trending Now', 'type': 'trending'},
+      {'title': 'Popular on RIYO', 'type': 'top_rated'},
+      {'title': 'New Releases', 'type': 'new_releases'},
+    ]; // Fallback
+  }
+
+  Future<List<Movie>> getComingSoonMovies({String? token}) async {
+    try {
+      const url = '$_backendUrl/movies/coming-soon';
+      final response = await http.get(
+        Uri.parse(url),
+        headers: token != null ? {'Authorization': 'Bearer $token'} : {},
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> results = json.decode(response.body);
+        return results.map((json) => Movie.fromJson(json)).toList();
+      }
+    } catch (e) {
+      debugPrint('Error fetching coming soon: $e');
+    }
+    return [];
+  }
+
+  Future<bool> toggleNotifyMe(String movieId, String token) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_backendUrl/users/notify-me/$movieId'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['isNotified'];
+      }
+    } catch (e) {
+      debugPrint('Error toggling notification: $e');
+    }
+    return false;
   }
 }

@@ -6,12 +6,42 @@ const router = express.Router();
 
 router.get('/', protect, async (req, res) => {
   try {
-    const { genre, isTrending } = req.query;
-    let query = {};
+    const { genre, isTrending, isFeatured, contentType, search, page = 1, limit = 20 } = req.query;
+    let query = { isPublished: true };
     if (genre) query.genre = genre;
     if (isTrending) query.isTrending = isTrending === 'true';
+    if (isFeatured) query.isFeatured = isFeatured === 'true';
+    if (contentType) query.contentType = contentType;
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ];
+    }
 
-    const movies = await Movie.find(query);
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const movies = await Movie.find(query)
+      .sort('-createdAt')
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await Movie.countDocuments(query);
+
+    res.json({
+      movies,
+      page: parseInt(page),
+      pages: Math.ceil(total / limit),
+      total
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.get('/coming-soon', protect, async (req, res) => {
+  try {
+    const movies = await Movie.find({ contentType: 'coming_soon' }).sort('-createdAt');
     res.json(movies);
   } catch (error) {
     res.status(500).json({ message: error.message });

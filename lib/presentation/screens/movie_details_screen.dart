@@ -2,32 +2,42 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:riyobox/providers/auth_provider.dart';
-import 'package:riyobox/providers/download_provider.dart';
-import 'package:riyobox/services/cast_service.dart';
-import 'package:riyobox/models/movie.dart';
-import 'package:riyobox/services/api_service.dart';
-import 'package:riyobox/presentation/widgets/movie_card.dart';
-import 'package:riyobox/presentation/widgets/shimmer_loading.dart';
+import 'package:riyo/providers/auth_provider.dart';
+import 'package:riyo/providers/download_provider.dart';
+import 'package:riyo/core/casting/presentation/providers/casting_provider.dart';
+import 'package:riyo/core/casting/domain/entities/cast_media.dart';
+import 'package:riyo/core/casting/presentation/widgets/cast_button.dart';
+import 'package:riyo/models/movie.dart';
+import 'package:riyo/services/api_service.dart';
+import 'package:riyo/presentation/widgets/movie_card.dart';
+import 'package:riyo/presentation/widgets/shimmer_loading.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart' as rp;
 
-class MovieDetailsScreen extends StatefulWidget {
+class MovieDetailsScreen extends rp.ConsumerStatefulWidget {
   final String movieId;
 
   const MovieDetailsScreen({super.key, required this.movieId});
 
   @override
-  State<MovieDetailsScreen> createState() => _MovieDetailsScreenState();
+  rp.ConsumerState<MovieDetailsScreen> createState() => _MovieDetailsScreenState();
 }
 
-class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
+class _MovieDetailsScreenState extends rp.ConsumerState<MovieDetailsScreen> {
   final ApiService _apiService = ApiService();
   Season? _selectedSeason;
   bool _isInWatchlist = false;
+  Future<Movie>? _movieFuture;
+  Future<List<Movie>>? _recommendationsFuture;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      setState(() {
+        _movieFuture = _apiService.getMovieDetails(widget.movieId, token: auth.token);
+        _recommendationsFuture = _apiService.getTrendingMovies(token: auth.token);
+      });
       _checkWatchlistStatus();
     });
   }
@@ -46,11 +56,10 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final auth = Provider.of<AuthProvider>(context);
     return Scaffold(
       backgroundColor: const Color(0xFF141414),
       body: FutureBuilder<Movie>(
-        future: _apiService.getMovieDetails(widget.movieId, token: auth.token),
+        future: _movieFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator(color: Colors.deepPurple));
@@ -114,11 +123,8 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
         icon: const Icon(Icons.arrow_back, color: Colors.white),
         onPressed: () => Navigator.pop(context),
       ),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.cast, color: Colors.white),
-          onPressed: () => context.push('/cast'),
-        ),
+      actions: const [
+        CastingButton(),
       ],
       flexibleSpace: FlexibleSpaceBar(
         background: Stack(
@@ -176,15 +182,29 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Prominent Poster overlay
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: CachedNetworkImage(
-                imageUrl: movie.posterPath.startsWith('http') ? movie.posterPath : 'https://image.tmdb.org/t/p/w500${movie.posterPath}',
-                width: 100,
-                height: 150,
-                fit: BoxFit.cover,
-                placeholder: (context, url) => const ShimmerLoading.rectangular(width: 100, height: 150),
-              ),
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: CachedNetworkImage(
+                    imageUrl: movie.posterPath.startsWith('http') ? movie.posterPath : 'https://image.tmdb.org/t/p/w500${movie.posterPath}',
+                    width: 100,
+                    height: 150,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => const ShimmerLoading.rectangular(width: 100, height: 150),
+                  ),
+                ),
+                if (movie.contentType == 'premium')
+                  Positioned(
+                    top: 4,
+                    left: 4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      decoration: BoxDecoration(color: Colors.yellow, borderRadius: BorderRadius.circular(2)),
+                      child: const Text('PREMIUM', style: TextStyle(color: Colors.black, fontSize: 8, fontWeight: FontWeight.w900)),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -268,11 +288,11 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
 
   Widget _buildActionsBar(BuildContext context, Movie movie) {
     final auth = Provider.of<AuthProvider>(context, listen: false);
-    final castService = Provider.of<CastService>(context);
     final downloads = Provider.of<DownloadProvider>(context);
     final bool isDownloaded = downloads.isDownloaded(movie.id);
     final bool isDownloading = downloads.isDownloading(movie.id);
     final double progress = downloads.getDownloadProgress(movie.id);
+    final bool isComingSoon = movie.contentType == 'coming_soon';
 
     return Column(
       children: [
@@ -291,15 +311,17 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
              Expanded(
                child: _buildActionIconButton(Icons.share_outlined, 'SHARE'),
              ),
-             if (castService.isConnected)
+             if (ref.watch(castingProvider).connectedDevice != null && !isComingSoon)
                Expanded(
                  child: _buildActionIconButton(
                    Icons.cast_connected,
                    'CAST',
-                   onTap: () => castService.loadMedia(
-                     movie.videoUrl ?? '',
-                     title: movie.title,
-                     posterUrl: movie.posterPath
+                   onTap: () => ref.read(castingProvider.notifier).castMedia(
+                     CastMedia(
+                       url: movie.videoUrl ?? '',
+                       title: movie.title,
+                       posterUrl: movie.posterPath,
+                     ),
                    )
                  ),
                ),
@@ -311,10 +333,18 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
           child: ElevatedButton.icon(
             onPressed: () {
                final id = movie.backendId ?? movie.id.toString();
-               context.push('/movie/$id/play');
+               if (isComingSoon) {
+                  if (movie.trailerUrl != null) {
+                    context.push('/movie/$id/play?url=${Uri.encodeComponent(movie.trailerUrl!)}');
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Trailer not available yet')));
+                  }
+               } else {
+                  context.push('/movie/$id/play');
+               }
             },
-            icon: const Icon(Icons.play_arrow, color: Colors.black),
-            label: const Text('RESUME', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+            icon: Icon(isComingSoon ? Icons.play_circle_outline : Icons.play_arrow, color: Colors.black),
+            label: Text(isComingSoon ? 'WATCH TRAILER' : 'RESUME', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 12),
@@ -325,7 +355,28 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
         const SizedBox(height: 12),
         SizedBox(
           width: double.infinity,
-          child: isDownloading
+          child: isComingSoon
+            ? OutlinedButton.icon(
+                onPressed: () async {
+                  if (!auth.isAuthenticated) {
+                    context.push('/login');
+                    return;
+                  }
+                  final res = await _apiService.toggleNotifyMe(movie.backendId ?? movie.id.toString(), auth.token!);
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(res ? 'We will notify you when it is released!' : 'Notifications disabled'))
+                  );
+                },
+                icon: const Icon(Icons.notifications_outlined, color: Colors.white),
+                label: const Text('NOTIFY ME', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.white24),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                ),
+              )
+            : isDownloading
             ? Column(
                 children: [
                   LinearProgressIndicator(value: progress, color: Colors.deepPurpleAccent, backgroundColor: Colors.white10),
@@ -365,7 +416,7 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
     return const Wrap(
       spacing: 8,
       children: [
-        _Badge(text: 'RIYOBOX ORIGINAL', color: Colors.deepPurpleAccent),
+        _Badge(text: 'RIYO ORIGINAL', color: Colors.deepPurpleAccent),
         _Badge(text: 'TRENDING NOW', color: Colors.redAccent),
       ],
     );
@@ -555,14 +606,15 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
   }
 
   Widget _buildRecommendationsSection(String title) {
-    final auth = Provider.of<AuthProvider>(context, listen: false);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+        Text(title,
+            style: const TextStyle(
+                color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
         const SizedBox(height: 16),
         FutureBuilder<List<Movie>>(
-          future: _apiService.getTrendingMovies(token: auth.token),
+          future: _recommendationsFuture,
           builder: (context, snapshot) {
             if (!snapshot.hasData) return const SizedBox(height: 180, child: ShimmerLoading.rectangular(height: 180));
             final movies = snapshot.data!;

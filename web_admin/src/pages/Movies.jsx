@@ -15,20 +15,23 @@ const Movies = () => {
     posterUrl: '',
     backdropUrl: '',
     videoUrl: '',
+    trailerUrl: '',
     year: '',
     duration: '',
     genre: '',
-    contentRating: ''
+    contentRating: '',
+    isFeatured: false,
+    contentType: 'free'
   });
 
   const fetchMovies = async () => {
     setLoading(true);
     try {
       const [movieRes, r2Res] = await Promise.all([
-        api.get('/admin/movies'),
+        api.get('/admin/movies?limit=100'),
         api.get('/upload')
       ]);
-      setMovies(movieRes.data);
+      setMovies(movieRes.data.movies || []);
       setR2Files(r2Res.data);
     } catch (err) {
       console.error(err);
@@ -100,7 +103,9 @@ const Movies = () => {
       ...formData,
       year: parseInt(formData.year) || new Date().getFullYear(),
       genre: formData.genre.split(',').map(g => g.trim()),
-      isTrending: true
+      isTrending: true,
+      isFeatured: formData.isFeatured,
+      contentType: formData.contentType
     };
 
     try {
@@ -108,8 +113,9 @@ const Movies = () => {
       setIsModalOpen(false);
       setFormData({
         title: '', description: '', posterUrl: '',
-        backdropUrl: '', videoUrl: '', year: '',
-        duration: '', genre: '', contentRating: ''
+            backdropUrl: '', videoUrl: '', trailerUrl: '', year: '',
+            duration: '', genre: '', contentRating: '',
+            isFeatured: false, contentType: 'free'
       });
       setUploadProgress({ poster: 0, video: 0 });
       fetchMovies();
@@ -251,6 +257,16 @@ const Movies = () => {
                 )}
               </div>
 
+              <div className="bg-[#262626] p-4 rounded-xl border border-white/5">
+                <label className="block text-xs font-black text-gray-500 mb-2 uppercase tracking-widest">Trailer Video URL</label>
+                <input
+                  placeholder="Paste direct MP4/HLS trailer link"
+                  className="w-full bg-[#141414] border border-white/10 rounded px-4 py-2 text-sm focus:border-purple-500 outline-none"
+                  value={formData.trailerUrl}
+                  onChange={(e) => setFormData({...formData, trailerUrl: e.target.value})}
+                />
+              </div>
+
               <div className="grid grid-cols-1 gap-4 bg-[#262626] p-4 rounded-xl border border-white/5">
                 <label className="block text-xs font-black text-gray-500 mb-1 uppercase tracking-widest">Poster & Visuals</label>
                 <div>
@@ -295,6 +311,30 @@ const Movies = () => {
                     onChange={(e) => setFormData({...formData, backdropUrl: e.target.value})}
                   />
                 </div>
+              </div>
+
+              <div className="bg-[#262626] p-4 rounded-xl border border-white/5">
+                <label className="block text-xs font-black text-gray-500 mb-2 uppercase tracking-widest">Content Classification</label>
+                <select
+                  className="w-full bg-[#141414] border border-white/10 rounded px-4 py-2 text-sm focus:border-purple-500 outline-none"
+                  value={formData.contentType}
+                  onChange={(e) => setFormData({...formData, contentType: e.target.value})}
+                >
+                  <option value="free">Free Access</option>
+                  <option value="premium">Premium Access</option>
+                  <option value="coming_soon">Coming Soon (Trailer only)</option>
+                </select>
+              </div>
+
+              <div className="flex items-center space-x-2 bg-[#262626] p-4 rounded-xl border border-white/5">
+                <input
+                  type="checkbox"
+                  id="isFeatured"
+                  className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                  checked={formData.isFeatured}
+                  onChange={(e) => setFormData({...formData, isFeatured: e.target.checked})}
+                />
+                <label htmlFor="isFeatured" className="text-sm font-bold text-gray-300">Feature in Home Carousel (Big Poster)</label>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>

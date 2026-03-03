@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:riyobox/providers/settings_provider.dart';
-import 'package:riyobox/providers/download_provider.dart';
-import 'package:riyobox/providers/auth_provider.dart';
+import 'package:riyo/providers/settings_provider.dart';
+import 'package:riyo/providers/download_provider.dart';
+import 'package:riyo/providers/auth_provider.dart';
 import 'package:go_router/go_router.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -22,6 +22,9 @@ class SettingsScreen extends StatelessWidget {
       ),
       body: ListView(
         children: [
+          _buildSectionHeader('APPEARANCE'),
+          _buildAppearanceSection(context, settings),
+          _buildDivider(),
           _buildSectionHeader('NETWORK'),
           SwitchListTile(
             secondary: const Icon(Icons.signal_wifi_off_outlined, color: Colors.white),
@@ -29,7 +32,7 @@ class SettingsScreen extends StatelessWidget {
             subtitle: const Text('Simulate no internet connection', style: TextStyle(color: Colors.grey)),
             value: settings.isOffline,
             onChanged: (bool value) => settings.setOfflineMode(value),
-            activeColor: Colors.redAccent,
+            activeThumbColor: Colors.redAccent,
           ),
           _buildDivider(),
           _buildSectionHeader('ACCOUNT & NOTIFICATIONS'),
@@ -39,10 +42,17 @@ class SettingsScreen extends StatelessWidget {
             subtitle: const Text('Receive alerts for new movies', style: TextStyle(color: Colors.grey)),
             value: settings.notificationsEnabled,
             onChanged: (bool value) => settings.toggleNotifications(value),
-            activeColor: Colors.deepPurpleAccent,
+            activeThumbColor: Colors.deepPurpleAccent,
           ),
           _buildDivider(),
           _buildSectionHeader('DOWNLOAD SETTINGS'),
+          ListTile(
+            leading: const Icon(Icons.download_for_offline_outlined, color: Colors.white),
+            title: const Text('Download Management', style: TextStyle(color: Colors.white)),
+            subtitle: const Text('Manage storage and delete files', style: TextStyle(color: Colors.grey)),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+            onTap: () => context.push('/download-settings'),
+          ),
           ListTile(
             leading: const Icon(Icons.high_quality_outlined, color: Colors.white),
             title: const Text('Video Quality for Downloads', style: TextStyle(color: Colors.white)),
@@ -54,7 +64,7 @@ class SettingsScreen extends StatelessWidget {
             title: const Text('Download Over Wi-Fi Only', style: TextStyle(color: Colors.white)),
             value: downloads.wifiOnly,
             onChanged: (val) => downloads.setWifiOnly(val),
-            activeColor: Colors.deepPurpleAccent,
+            activeThumbColor: Colors.deepPurpleAccent,
           ),
           _buildSectionHeader('AUTO-DOWNLOAD'),
           CheckboxListTile(
@@ -84,7 +94,7 @@ class SettingsScreen extends StatelessWidget {
             title: const Text('Auto-delete after watching', style: TextStyle(color: Colors.white)),
             value: downloads.autoDeleteAfterWatching,
             onChanged: (val) => downloads.setAutoDeleteAfterWatching(val),
-            activeColor: Colors.deepPurpleAccent,
+            activeThumbColor: Colors.deepPurpleAccent,
           ),
           ListTile(
             leading: const Icon(Icons.timer_outlined, color: Colors.white),
@@ -112,18 +122,30 @@ class SettingsScreen extends StatelessWidget {
             onTap: () => _showLanguageDialog(context, settings),
           ),
           _buildDivider(),
-          _buildSectionHeader('SUPPORT'),
+          _buildSectionHeader('SUPPORT & POLICY'),
           ListTile(
-            leading: const Icon(Icons.help_outline, color: Colors.white),
-            title: const Text('Help Center', style: TextStyle(color: Colors.white)),
-            trailing: const Icon(Icons.open_in_new, size: 16, color: Colors.grey),
-            onTap: () {},
+            leading: const Icon(Icons.contact_support_outlined, color: Colors.white),
+            title: const Text('Contacts', style: TextStyle(color: Colors.white)),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+            onTap: () => context.push('/contacts'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.description_outlined, color: Colors.white),
+            title: const Text('Terms of Service', style: TextStyle(color: Colors.white)),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+            onTap: () => context.push('/terms'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.privacy_tip_outlined, color: Colors.white),
+            title: const Text('Privacy Policy', style: TextStyle(color: Colors.white)),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+            onTap: () => context.push('/privacy'),
           ),
           ListTile(
             leading: const Icon(Icons.info_outline, color: Colors.white),
-            title: const Text('About RIYOBOX', style: TextStyle(color: Colors.white)),
+            title: const Text('About', style: TextStyle(color: Colors.white)),
             trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-            onTap: () {},
+            onTap: () => context.push('/about'),
           ),
           _buildDivider(),
           ListTile(
@@ -133,7 +155,7 @@ class SettingsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 40),
           const Center(
-            child: Text('RIYOBOX v2.4.0', style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
+            child: Text('RIYO v2.4.0', style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
           ),
           const SizedBox(height: 40),
         ],
@@ -153,6 +175,75 @@ class SettingsScreen extends StatelessWidget {
 
   Widget _buildDivider() {
     return const Divider(color: Colors.white10, thickness: 1, indent: 16, endIndent: 16);
+  }
+
+  Widget _buildAppearanceSection(BuildContext context, SettingsProvider settings) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          _buildThemeCard(
+            context,
+            'Device',
+            Icons.phonelink_setup,
+            settings.themeMode == ThemeMode.system,
+            () => settings.setThemeMode(ThemeMode.system),
+          ),
+          _buildThemeCard(
+            context,
+            'Dark',
+            Icons.dark_mode,
+            settings.themeMode == ThemeMode.dark,
+            () => settings.setThemeMode(ThemeMode.dark),
+          ),
+          _buildThemeCard(
+            context,
+            'Light',
+            Icons.light_mode,
+            settings.themeMode == ThemeMode.light,
+            () => settings.setThemeMode(ThemeMode.light),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildThemeCard(BuildContext context, String label, IconData icon, bool isSelected, VoidCallback onTap) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 100,
+            height: 80,
+            decoration: BoxDecoration(
+              color: isSelected ? colorScheme.primary.withAlpha(40) : const Color(0xFF1C1C1C),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isSelected ? colorScheme.primary : Colors.white10,
+                width: 2,
+              ),
+            ),
+            child: Icon(
+              icon,
+              color: isSelected ? colorScheme.primary : Colors.grey,
+              size: 32,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? Colors.white : Colors.grey,
+              fontSize: 12,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   String _getQualityText(DownloadQuality quality) {

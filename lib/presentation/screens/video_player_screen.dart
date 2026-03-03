@@ -5,26 +5,28 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import 'dart:async';
 import 'dart:io';
-import 'dart:developer' as developer;
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:riyobox/providers/playback_provider.dart';
-import 'package:riyobox/providers/auth_provider.dart';
-import 'package:riyobox/providers/download_provider.dart';
-import 'package:riyobox/services/api_service.dart';
-import 'package:riyobox/models/movie.dart';
+import 'package:riyo/providers/playback_provider.dart';
+import 'package:riyo/providers/auth_provider.dart';
+import 'package:riyo/providers/download_provider.dart';
+import 'package:riyo/services/api_service.dart';
+import 'package:riyo/models/movie.dart';
+import 'package:riyo/core/casting/presentation/widgets/cast_button.dart';
+import 'package:riyo/core/casting/presentation/providers/casting_provider.dart';
+import 'package:riyo/core/casting/domain/entities/cast_media.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart' as rp;
 
-class VideoPlayerScreen extends StatefulWidget {
+class VideoPlayerScreen extends rp.ConsumerStatefulWidget {
   final String? movieId;
   final String? videoUrl;
 
   const VideoPlayerScreen({super.key, this.movieId, this.videoUrl});
 
   @override
-  State<VideoPlayerScreen> createState() => _VideoPlayerScreenState();
+  rp.ConsumerState<VideoPlayerScreen> createState() => _VideoPlayerScreenState();
 }
 
-class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
+class _VideoPlayerScreenState extends rp.ConsumerState<VideoPlayerScreen> {
   VideoPlayerController? _controller;
   bool _isControlsVisible = true;
   Timer? _hideControlsTimer;
@@ -43,6 +45,48 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _initPlayer();
     _initVolume();
     _initBrightness();
+    _initCastListener();
+  }
+
+  void _initCastListener() {
+    // Listen for cast connection
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.listenManual(castingProvider, (previous, next) {
+        if (next.connectedDevice != null && _controller != null && _controller!.value.isPlaying) {
+           _startCasting();
+        }
+      });
+    });
+  }
+
+  Future<void> _startCasting() async {
+    final castingNotifier = ref.read(castingProvider.notifier);
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    String? url = widget.videoUrl;
+    String? title = "Video";
+    String? poster;
+
+    if (widget.movieId != null) {
+      final movie = await ApiService().getMovieDetails(widget.movieId!, token: auth.token);
+      url = movie.videoUrl;
+      title = movie.title;
+      poster = movie.posterPath.startsWith('http') ? movie.posterPath : 'https://image.tmdb.org/t/p/w500${movie.posterPath}';
+    }
+
+    if (url != null) {
+      _controller?.pause();
+      await castingNotifier.castMedia(CastMedia(
+        url: url,
+        title: title,
+        posterUrl: poster,
+      ));
+      if (mounted) {
+        final deviceName = ref.read(castingProvider).connectedDevice?.name;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Casting to $deviceName'))
+        );
+      }
+    }
   }
 
   Future<void> _initPlayer() async {
@@ -59,14 +103,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       if (downloadedMovie.id != 0 && downloadedMovie.localPath != null) {
         final file = File(downloadedMovie.localPath!);
         if (await file.exists()) {
-           developer.log('Playing from local path: ${downloadedMovie.localPath}');
+           debugPrint('Playing from local path: ${downloadedMovie.localPath}');
            _controller = VideoPlayerController.file(file)
             ..initialize().then((_) {
               if (mounted) {
                 setState(() {});
                 final progress = Provider.of<PlaybackProvider>(context, listen: false).getProgress(widget.movieId ?? '');
-                if (progress > Duration.zero) _showResumeDialog(progress);
-                else _controller!.play();
+                if (progress > Duration.zero) {
+                  _showResumeDialog(progress);
+                } else {
+                  _controller!.play();
+                }
                 _startHideControlsTimer();
               }
             });
@@ -77,12 +124,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     }
 
     if (url == null && widget.movieId != null) {
+      if (!mounted) return;
       try {
-        final token = Provider.of<AuthProvider>(context, listen: false).token;
+        final auth = Provider.of<AuthProvider>(context, listen: false);
+        final token = auth.token;
         final movie = await ApiService().getMovieDetails(widget.movieId!, token: token);
+        if (!mounted) return;
         url = movie.videoUrl;
       } catch (e) {
-        developer.log('Error fetching movie details: $e');
+        debugPrint('Error fetching movie details: $e');
       }
     }
 
@@ -110,9 +160,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       if (mounted) {
         final isBuffering = _controller!.value.isBuffering;
         if (isBuffering != _isBuffering) {
-           setState(() => _isBuffering = isBuffering);
+          setState(() => _isBuffering = isBuffering);
         } else {
-           setState(() {});
+          setState(() {});
         }
       }
     });
@@ -129,7 +179,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     try {
       _currentBrightness = await ScreenBrightness().application;
     } catch (e) {
-      developer.log('Failed to get current brightness: $e', name: 'video_player_screen');
+      debugPrint('Failed to get current brightness: $e');
       _currentBrightness = 0.5;
     }
     if (mounted) {
@@ -302,7 +352,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          IconButton(icon: const Icon(Icons.cast, color: Colors.white), onPressed: () => context.push('/cast')),
+          const CastingButton(),
           IconButton(icon: const Icon(Icons.more_vert, color: Colors.white), onPressed: () => _showSettingsMenu()),
         ],
       ),

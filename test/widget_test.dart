@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:riyobox/main.dart';
+import 'package:riyo/main.dart';
 
 void main() {
   setUpAll(() {
@@ -13,7 +13,7 @@ void main() {
     await tester.pumpWidget(const MyApp());
 
     // Splash Screen should be visible initially
-    expect(find.text('RIYOBOX'), findsAtLeast(1));
+    expect(find.text('RIYO'), findsAtLeast(1));
     expect(find.text('PREMIUM STREAMING EXPERIENCE'), findsOneWidget);
 
     // Wait for splash animation to finish (2.5s in code)
@@ -64,9 +64,6 @@ class _MockHttpClientRequest implements HttpClientRequest {
   HttpHeaders get headers => _MockHttpHeaders();
 
   @override
-  Future<HttpClientRequest> openUrl(String method, Uri url) async => this;
-
-  @override
   Future<HttpClientResponse> close() async => _MockHttpClientResponse();
 
   @override
@@ -94,8 +91,8 @@ class _MockHttpClientResponse implements HttpClientResponse {
   HttpClientResponseCompressionState get compressionState => HttpClientResponseCompressionState.notCompressed;
 
   @override
-  StreamSubscription<List<int>> listen(void onData(List<int> event)?,
-      {Function? onError, void onDone()?, bool? cancelOnError}) {
+  StreamSubscription<List<int>> listen(void Function(List<int> event)? onData,
+      {Function? onError, void Function()? onDone, bool? cancelOnError}) {
     return Stream.fromIterable([_data]).listen(onData,
         onError: onError, onDone: onDone, cancelOnError: cancelOnError);
   }

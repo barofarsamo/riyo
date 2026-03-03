@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:riyobox/providers/auth_provider.dart';
+import 'package:riyo/providers/auth_provider.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -88,7 +88,7 @@ class _LoginScreenState extends State<LoginScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text('New to RIYOBOX? ', style: TextStyle(color: Colors.grey)),
+                const Text('New to RIYO? ', style: TextStyle(color: Colors.grey)),
                 GestureDetector(
                   onTap: () => context.push('/signup'),
                   child: const Text('Sign up now.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),

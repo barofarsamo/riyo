@@ -1,6 +1,6 @@
-# RIYOBOX - Premium Streaming App
+# RIYO - Premium Streaming App
 
-RIYOBOX is a production-grade movie streaming application prototype built with Flutter and Node.js. It features a modern, emoji-free UI designed for high-quality user experiences.
+RIYO is a production-grade movie streaming application prototype built with Flutter and Node.js. It features a modern, emoji-free UI designed for high-quality user experiences.
 
 ## 🚀 Key Features
 
@@ -38,7 +38,7 @@ The backend is configured for easy deployment on [Render](https://render.com).
 ## 📂 Project Structure
 
 ```text
-riyobox/
+riyo/
 ├── lib/                      # Flutter source code
 │   ├── models/               # Data models
 │   ├── presentation/         # UI Screens and Widgets
@@ -74,7 +74,7 @@ The Admin Panel is hidden from regular users and only appears for accounts with 
     *   **Email:** `admin@example.com`
     *   **Password:** `admin123`
 
-To access it, log in with the credentials above, go to **My RIYOBOX** (Profile tab), and click on **Admin Panel**.
+To access it, log in with the credentials above, go to **My RIYO** (Profile tab), and click on **Admin Panel**.
 
 ## 📺 Casting Setup
 For detailed instructions on configuring TV casting for Android and iOS, see [CAST_SETUP.md](./CAST_SETUP.md).

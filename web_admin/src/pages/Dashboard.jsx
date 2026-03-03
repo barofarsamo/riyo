@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import api from '../utils/api';
+import api, { API_URL } from '../utils/api';
 
 const Dashboard = () => {
   const [stats, setStats] = useState({
@@ -35,7 +35,7 @@ const Dashboard = () => {
     <div>
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="text-gray-400">Welcome to RIYOBOX control center.</p>
+        <p className="text-gray-400">Welcome to RIYO control center.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
@@ -60,7 +60,7 @@ const Dashboard = () => {
           <div className="flex items-center justify-between p-4 bg-[#262626] rounded-lg mb-4">
              <div className="flex items-center">
                 <div className="w-3 h-3 bg-green-500 rounded-full mr-4 animate-pulse"></div>
-                <span>Backend API: https://riyobox1-1.onrender.com</span>
+                <span>Backend API: {API_URL}</span>
              </div>
              <span className="text-green-500 text-sm font-bold uppercase">Online</span>
           </div>

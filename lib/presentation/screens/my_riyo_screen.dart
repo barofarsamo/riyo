@@ -1,15 +1,14 @@
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:riyobox/presentation/widgets/shimmer_loading.dart';
-import 'package:riyobox/models/movie.dart';
-import 'package:riyobox/services/api_service.dart';
-import 'package:riyobox/presentation/widgets/state_widgets.dart';
-import 'package:riyobox/providers/auth_provider.dart';
+import 'package:riyo/presentation/widgets/shimmer_loading.dart';
+import 'package:riyo/models/movie.dart';
+import 'package:riyo/services/api_service.dart';
+import 'package:riyo/providers/auth_provider.dart';
 import 'package:provider/provider.dart';
 
-class MyRiyoboxScreen extends StatelessWidget {
-  const MyRiyoboxScreen({super.key});
+class MyRiyoScreen extends StatelessWidget {
+  const MyRiyoScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +20,7 @@ class MyRiyoboxScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: const Color(0xFF141414),
         elevation: 0,
-        title: const Text('MY RIYOBOX', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white)),
+        title: const Text('MY RIYO', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white)),
         actions: [
           IconButton(
             icon: const Icon(Icons.cast, color: Colors.white),
@@ -31,16 +30,6 @@ class MyRiyoboxScreen extends StatelessWidget {
             icon: const Icon(Icons.settings, color: Colors.white),
             onPressed: () => context.push('/settings'),
           ),
-          Padding(
-            padding: const EdgeInsets.only(right: 16.0),
-            child: GestureDetector(
-              onTap: () => context.push('/profile'),
-              child: const CircleAvatar(
-                radius: 16,
-                backgroundImage: NetworkImage('https://picsum.photos/seed/profile/100/100'),
-              ),
-            ),
-          ),
         ],
       ),
       body: SingleChildScrollView(
@@ -48,11 +37,10 @@ class MyRiyoboxScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            _buildProfileHeader(context),
-            const SizedBox(height: 32),
+            const SizedBox(height: 20),
             _buildStatsSection(context, auth.token),
             const SizedBox(height: 40),
-            _buildSectionHeader('MY WATCHLIST', onTap: () {}),
+            _buildSectionHeader('MY WATCHLIST', onTap: () => context.push('/genre/Watchlist')),
             const SizedBox(height: 16),
             FutureBuilder<List<Movie>>(
               future: auth.token != null ? apiService.getWatchlist(auth.token!) : Future.value([]),
@@ -70,52 +58,6 @@ class MyRiyoboxScreen extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildProfileHeader(BuildContext context) {
-    return Column(
-      children: [
-        GestureDetector(
-          onTap: () => context.push('/profile'),
-          child: Stack(
-            clipBehavior: Clip.none,
-            alignment: Alignment.bottomRight,
-            children: [
-              const CircleAvatar(
-                radius: 45,
-                backgroundColor: Color(0xFF262626),
-                child: Icon(Icons.person, color: Colors.grey, size: 50),
-              ),
-              Positioned(
-                right: -2,
-                bottom: -2,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.deepPurpleAccent,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: const Color(0xFF141414), width: 2),
-                  ),
-                  padding: const EdgeInsets.all(6),
-                  child: const Icon(Icons.edit, color: Colors.white, size: 16),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        const Text('Jules Engineer', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.deepPurpleAccent.withAlpha(40),
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(color: Colors.deepPurpleAccent, width: 1),
-          ),
-          child: const Text('PREMIUM MEMBER', style: TextStyle(color: Colors.deepPurpleAccent, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
-        ),
-      ],
     );
   }
 
@@ -205,7 +147,10 @@ class MyRiyoboxScreen extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(movie.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 4),
-                  Text('${movie.releaseDate.split('-')[0]} | ${movie.genres?.first ?? "N/A"}', style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                  Text(
+                    '${movie.releaseDate.split('-')[0]}${movie.runtime != null ? " | ${_formatDuration(movie.runtime!)}" : ""}',
+                    style: const TextStyle(color: Colors.grey, fontSize: 11),
+                  ),
                 ],
               ),
             ),
@@ -228,13 +173,6 @@ class MyRiyoboxScreen extends StatelessWidget {
           ),
         if (auth.role == 'admin')
           const SizedBox(height: 8),
-        _buildSettingsButton(
-          context,
-          icon: Icons.person_outline,
-          text: 'Profile Information',
-          onTap: () => context.push('/profile'),
-        ),
-        const SizedBox(height: 8),
         _buildSettingsButton(
           context,
           icon: Icons.settings_outlined,
@@ -273,12 +211,21 @@ class MyRiyoboxScreen extends StatelessWidget {
     );
   }
 
+  String _formatDuration(int minutes) {
+    final int h = minutes ~/ 60;
+    final int m = minutes % 60;
+    if (h > 0) {
+      return '${h}h ${m}m';
+    }
+    return '${m}m';
+  }
+
   Widget _buildFooter() {
-    return Column(
+    return const Column(
       children: [
-        const Text('RIYOBOX PREMIUM V2.4.0', style: TextStyle(color: Colors.white24, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
-        const SizedBox(height: 4),
-        const Text('CLOUD ID: 9L6K4D38', style: TextStyle(color: Colors.white24, fontSize: 10, letterSpacing: 1.1)),
+        Text('RIYO PREMIUM V2.4.0', style: TextStyle(color: Colors.white24, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+        SizedBox(height: 4),
+        Text('CLOUD ID: 9L6K4D38', style: TextStyle(color: Colors.white24, fontSize: 10, letterSpacing: 1.1)),
       ],
     );
   }

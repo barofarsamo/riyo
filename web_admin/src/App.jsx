@@ -1,65 +1,45 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import Movies from './pages/Movies';
-import Media from './pages/Media';
-import Users from './pages/Users';
 import Sidebar from './components/Sidebar';
 
+// Lazy load pages
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Movies = lazy(() => import('./pages/Movies'));
+const Media = lazy(() => import('./pages/Media'));
+const Users = lazy(() => import('./pages/Users'));
+const Layout = lazy(() => import('./pages/Layout'));
+const Management = lazy(() => import('./pages/Management'));
+
+// Loader
+const PageLoader = () => (
+  <div className="h-full w-full flex items-center justify-center bg-[#141414]">
+    <div className="w-10 h-10 border-4 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
+  </div>
+);
+
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
-  const [role, setRole] = useState(localStorage.getItem('role'));
-
-  const handleLogin = (token, userRole) => {
-    localStorage.setItem('token', token);
-    localStorage.setItem('role', userRole);
-    setIsAuthenticated(true);
-    setRole(userRole);
-  };
-
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('role');
-    setIsAuthenticated(false);
-    setRole(null);
+    window.location.href = '/';
   };
-
-  if (!isAuthenticated) {
-    return (
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login onLogin={handleLogin} />} />
-          <Route path="*" element={<Navigate to="/login" />} />
-        </Routes>
-      </BrowserRouter>
-    );
-  }
-
-  if (role !== 'admin') {
-    return (
-      <div className="h-screen flex items-center justify-center bg-[#141414] text-white">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold mb-4">Access Denied</h1>
-          <p className="text-gray-400 mb-6">You do not have permission to access the admin panel.</p>
-          <button onClick={handleLogout} className="px-6 py-2 bg-purple-600 rounded">Logout</button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <BrowserRouter>
       <div className="flex min-h-screen bg-[#141414]">
         <Sidebar onLogout={handleLogout} />
         <main className="flex-1 p-8 overflow-y-auto">
-          <Routes>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/movies" element={<Movies />} />
-            <Route path="/media" element={<Media />} />
-            <Route path="/users" element={<Users />} />
-            <Route path="*" element={<Navigate to="/dashboard" />} />
-          </Routes>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/movies" element={<Movies />} />
+              <Route path="/media" element={<Media />} />
+              <Route path="/users" element={<Users />} />
+              <Route path="/layout" element={<Layout />} />
+              <Route path="/management" element={<Management />} />
+              <Route path="*" element={<Navigate to="/dashboard" />} />
+            </Routes>
+          </Suspense>
         </main>
       </div>
     </BrowserRouter>

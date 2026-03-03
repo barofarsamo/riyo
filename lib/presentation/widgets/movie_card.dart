@@ -2,8 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:riyobox/models/movie.dart';
-import 'package:riyobox/presentation/widgets/shimmer_loading.dart';
+import 'package:riyo/models/movie.dart';
+import 'package:riyo/presentation/widgets/shimmer_loading.dart';
 
 class MovieCard extends StatelessWidget {
   final Movie movie;
@@ -36,6 +36,19 @@ class MovieCard extends StatelessWidget {
               ),
             ),
           ),
+          if (movie.contentType == 'premium')
+            Positioned(
+              top: 8,
+              left: 8,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.yellow,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                      child: const Text('PREMIUM', style: TextStyle(color: Colors.black, fontSize: 8, fontWeight: FontWeight.w900)),
+              ),
+            ),
           if (movie.isDownloaded)
             Positioned(
               top: 8,

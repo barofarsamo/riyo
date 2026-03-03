@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:riyobox/providers/auth_provider.dart';
+import 'package:riyo/providers/auth_provider.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -30,7 +30,7 @@ class WelcomeScreen extends StatelessWidget {
                 children: [
                   const SizedBox(height: 40),
                   const Text(
-                    'RIYOBOX',
+                    'RIYO',
                     style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.w900,

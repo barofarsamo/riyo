@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:riyobox/providers/auth_provider.dart';
+import 'package:riyo/providers/auth_provider.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -90,7 +90,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       ],
                       colors: [
                         Colors.transparent,
-                        Colors.deepPurpleAccent.withOpacity(0.1),
+                        Colors.deepPurpleAccent.withValues(alpha: 0.1),
                         Colors.transparent,
                       ],
                     ),
@@ -113,7 +113,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                         color: Colors.transparent,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.deepPurpleAccent.withOpacity(0.3),
+                            color: Colors.deepPurpleAccent.withValues(alpha: 0.3),
                             blurRadius: 50,
                             spreadRadius: 10,
                           ),
@@ -123,12 +123,12 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           const Text(
-                            'RIYOBOX',
+                            'RIYO',
                             style: TextStyle(
-                              fontSize: 48,
+                              fontSize: 64,
                               fontWeight: FontWeight.w900,
                               color: Colors.white,
-                              letterSpacing: 8,
+                              letterSpacing: 12,
                             ),
                           ),
                           Container(

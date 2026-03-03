@@ -1,10 +1,10 @@
-# Blueprint: RIYOBOX - A Netflix Clone
+# Blueprint: RIYO - A Netflix Clone
 
-This document outlines the plan for creating a Netflix clone application named RIYOBOX using Flutter.
+This document outlines the plan for creating a Netflix clone application named RIYO using Flutter.
 
 ## 1. Project Overview
 
-RIYOBOX will be a feature-rich, high-quality clone of the popular streaming service, Netflix. It will showcase a modern and responsive UI, dynamic data from a movie API, and a seamless video playback experience.
+RIYO will be a feature-rich, high-quality clone of the popular streaming service, Netflix. It will showcase a modern and responsive UI, dynamic data from a movie API, and a seamless video playback experience.
 
 ## 2. Core Features
 
@@ -29,7 +29,7 @@ I will follow a clean and scalable architecture to ensure the app is maintainabl
 
 1.  **Project Setup**: 
     - Create a new `blueprint.md` file.
-    - Update the project name to "RIYOBOX" in `pubspec.yaml`, `README.md`, and `web/index.html`.
+    - Update the project name to "RIYO" in `pubspec.yaml`, `README.md`, and `web/index.html`.
     - Add necessary dependencies: `http` for API calls.
 2.  **Theming**: 
     - Create a dark theme in `lib/main.dart` to match the Netflix aesthetic.
@@ -59,6 +59,115 @@ I will follow a clean and scalable architecture to ensure the app is maintainabl
 1.  **Integrate Video Player**:
     - Connect the "Play" button on the movie details screen to the existing `VideoPlayerScreen`.
 
-## 5. Current Task: Initial Setup
+## 5. Recent Fixes and Improvements
 
-I will now begin by setting up the project, including updating the necessary files and adding the `http` dependency.
+### 1. Unified Backend API URL
+- Centralized the backend API URL to `https://riyobox1-1.onrender.com` across all components:
+  - **Flutter App**: Updated `lib/core/constants.dart`.
+  - **Web Admin**: Updated `web_admin/src/utils/api.js`.
+  - **Web User**: Updated `web_user/src/utils/api.js`.
+- Updated the **Admin Dashboard** UI to dynamically display the active Backend API URL instead of a hardcoded string.
+
+### 2. Backend Bug Fixes
+- Fixed a typo in the default admin email in `backend/server.js` (`admin@exampl.com` -> `admin@example.com`).
+- Improved environment variable validation in `backend/server.js` to provide more descriptive warnings when configuration is missing.
+
+### 3. Flutter Code Quality & Analysis
+- Resolved over 15 linting and analysis issues in the Flutter codebase:
+  - Fixed `use_build_context_synchronously` warnings in `AdminPanelScreen`, `CastScreen`, and `VideoPlayerScreen` by adding proper `mounted` checks.
+  - Replaced deprecated `activeColor` with `activeThumbColor` in `SettingsScreen`.
+  - Replaced deprecated `withOpacity` with `withValues(alpha: ...)` in `SplashScreen`.
+  - Added missing `const` constructors for better performance.
+  - Removed unused imports and fixed minor syntax warnings.
+
+### 4. Admin Connectivity & User Experience
+- Ensured full integration between the Admin Panel (Web & Mobile) and the Backend.
+- Verified that movie uploads, user management, and R2 storage library access are functional and correctly mapped to backend routes.
+- **Improved Admin UX**: Implemented transparent auto-login for the Web Admin Panel. When an admin opens the panel, it automatically authenticates using default credentials and redirects straight to the Dashboard, hiding the manual login screen.
+
+### 5. UI Improvements & Profile Removal
+- **Removed Profile Selection**: To streamline the experience, all profile avatars and profile management screens have been removed. The app now focuses on a single-user experience.
+- **Enhanced Movie Info**: Horizontal lists and grids now show the movie's **release year** and **duration** (e.g., "2024 | 2h 15m") directly below the poster, providing more context to users at a glance.
+- **Functional 'View All'**: Category and Genre headers (like "Trending Now", "Popular", etc.) are now interactive. Clicking on a header or its arrow icon navigates to a full list of movies in that category.
+
+### 6. Advanced Download Management & UI Polish
+- **Redesigned Downloads Screen**:
+  - Movie items now display **Title, Year, Duration, and File Size**.
+  - Tapping a movie item starts playback immediately.
+  - Added a YouTube-style action menu (`more_vert`) for each download with options to Save, Delete, or Add to Playlist.
+  - Added a three-dot header menu with quick access to "Download Settings" and "Help".
+- **New Download Settings Screen**:
+  - Centralized location for managing offline content.
+  - New features: **Delete Oldest Download**, **Delete Largest Download**, and a list to manage downloads by size.
+  - Accessible from both the main Settings and the Downloads screen.
+- **Header Cleanup**:
+  - Completely removed profile icons/avatars from all app headers.
+  - Removed "Online/Offline" status indicators from the Categories header for a cleaner look.
+
+### 7. TV Series Enhancements in Downloads
+- **TV Show Details**: The Downloads screen now distinguishes between movies and TV series.
+- **Series-Specific Info**: For series, the UI now displays the **Series Name, Season Number, and the number of downloaded episodes** (e.g., "The Boys | Season 6 | 5 episodes").
+- **Integrated Storage Stats**: Each download (movie or series) continues to show its total file size.
+- **Model Updates**: Updated the `Movie` data model to support `seasonNumber` and improved the parsing of TV show metadata.
+
+### 8. Dynamic Content Management & Security Bypass
+- **Admin Panel Access**: Completely removed the manual login process for the Admin Panel. The Dashboard is now directly accessible, and backend authentication is automatically bypassed for admin operations.
+- **Dynamic Header Filters**: Admin can now manage the categories (filters) shown in the Home screen header (e.g., "Movies", "TV Shows", "Anime"). These can be added, renamed, or deleted via the new **Home Layout** page in Web Admin.
+- **Dynamic Home Sections**: Admin can now manage the rows on the Home screen (e.g., "Trending Now", "Popular", or specific genre rows). These sections are fully customizable and reflected instantly in the mobile app.
+- **Backend Infrastructure**: Added `Category` and `HomeSection` database models and corresponding configuration routes to support dynamic layouts.
+- **Advanced Layout Control**: Implemented reordering (Move Up/Down) for both header filters and home sections, giving admins full control over the application's information hierarchy and layout flow.
+
+### 9. Enhanced Support & Policy
+- **Renamed Support Section**: The settings section is now "SUPPORT & POLICY" to better reflect its content.
+- **New Support Screens**: Implemented four dedicated screens for better transparency and user communication:
+  - **Contacts**: Shows email, phone, and website support info.
+  - **Terms of Service**: Displays the legal usage agreement.
+  - **Privacy Policy**: Details how user data is handled.
+  - **About**: Shows the app branding, description, and current version (v2.4.0).
+- **Navigation Integration**: All new screens are fully reachable from the Settings menu.
+
+### 10. Appearance Settings & Featured Content
+- **Theme Selection**: Added a new "APPEARANCE" section to the app settings. Users can now choose between **Device Theme**, **Dark Theme**, and **Light Theme**. The selection is persisted and applies globally.
+- **Featured Carousel**: The Home screen carousel now prioritizes "Featured" movies (marked by admin) with **extra-large posters** for a more immersive experience.
+- **Admin Content Control**: Added the ability for administrators to mark specific movies as "Featured" via the Web Admin Panel, giving them direct control over the home screen's main highlights.
+
+### 11. Coming Soon & Trailer Management System
+- **Content Classification**: Movies can now be categorized as **Free**, **Premium**, or **Coming Soon**.
+- **Coming Soon System**:
+  - Dedicated **Coming Soon** tab in the mobile app.
+  - Users can watch trailers and tap "Notify Me" for upcoming releases.
+  - When a movie is published, users receive an automatic notification record in the database.
+- **Trailer Management**: Admin can upload, replace, and manage trailers for any movie.
+- **Premium Control**: Integrated "Premium" badges on movie cards and details to highlight exclusive content.
+- **Publication Flow**: Seamless transition from "Coming Soon" to "Published" status with automatic user alerts.
+
+### 12. Rebranding & Professional Notification System
+- **Rebranded to RIYO**: Updated app labels, text, and created a sleek geometric "R" logo styled after professional aerospace branding.
+- **FCM & Local Notifications**: Integrated Firebase Cloud Messaging for push notifications and `flutter_local_notifications` for high-priority foreground alerts (WhatsApp-style banners).
+- **Status Bar Optimization**: Derived a professional white-mask notification icon from the APK logo, following Android guidelines for transparency and contrast.
+- **Dynamic Alerts**: Implemented a notification infrastructure that handles upcoming movie alerts, notifying interested users the moment a "Coming Soon" title is published.
+- **Developer Infrastructure**: Provided `NOTIFICATION_ICON_SETUP.md` with precise instructions for generating density-perfect icons.
+
+### 13. Performance Optimization & Scalability (Audit v1.0)
+- **Database Speed**: Implemented B-Tree indexes on the `Movie` model for high-speed filtering and sorting.
+- **Server-Side Pagination**: Added `page` and `limit` support to all movie endpoints, preventing large payloads and reducing database load.
+- **Enhanced API Security & Speed**:
+    - Integrated `helmet` for production security headers.
+    - Enabled `compression` (Gzip) for significantly smaller API response sizes.
+    - Implemented `express-rate-limit` on authentication routes to prevent resource exhaustion.
+- **Server-Side Search**: Optimized searching by moving logic from the client to the server using MongoDB regex matching.
+- **Frontend Bundle Optimization**: Implemented **Route-based Code Splitting** in React using `React.lazy` and `Suspense`, reducing initial load times by only downloading the necessary code for the current view.
+- **Infrastructure Strategy**: Conducted a full performance audit and provided a comprehensive `OPTIMIZATION.md` guide for scaling to high traffic (Redis caching, PM2 clustering, and Direct S3/R2 uploads).
+
+### 14. Advanced TV Casting & State Management Migration
+- **Unified Casting Architecture**: Replaced the basic casting service with a professional, modular casting system in `lib/core/casting`.
+- **Hybrid Device Discovery**: Implemented simultaneous discovery and control for both **Google Cast (Chromecast)** and **DLNA/UPnP** (Smart TVs, Soundbars, etc.).
+- **Riverpod 3.0 Integration**: Migrated the casting module to use **Riverpod 3.0** with the new `Notifier` and `NotifierProvider` APIs, ensuring the app is future-proof.
+- **Improved UI/UX**:
+    - New `CastingButton` with active connection state indicators.
+    - Centralized `CastDialog` for device selection and playback control.
+    - Seamless integration with `VideoPlayerScreen` for automatic casting handoff.
+- **Cleanup**: Removed the legacy `CastService`, `/cast` route, and associated old widgets to reduce codebase complexity.
+
+## 6. Project Status
+All components (Backend, Mobile App, Web Admin, Web User) are now synchronized and pointing to the same production backend. The codebase is cleaner, follows better Flutter practices, and is ready for further feature development.

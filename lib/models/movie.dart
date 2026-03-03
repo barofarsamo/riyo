@@ -13,8 +13,13 @@ class Movie {
   final String? director;
   final String? contentRating;
   final bool isTvShow;
+  final int? seasonNumber;
   final List<Season>? seasons;
   final String? videoUrl;
+  final String? trailerUrl;
+  final String contentType; // free, premium, coming_soon
+  final bool isPublished;
+  final List<String> notifyUsers; // List of user IDs
   final String? localPath;
 
   // Download related fields
@@ -39,8 +44,13 @@ class Movie {
     this.director,
     this.contentRating,
     this.isTvShow = false,
+    this.seasonNumber,
     this.seasons,
     this.videoUrl,
+    this.trailerUrl,
+    this.contentType = 'free',
+    this.isPublished = true,
+    this.notifyUsers = const [],
     this.localPath,
     this.isDownloaded = false,
     this.isDownloading = false,
@@ -62,7 +72,11 @@ class Movie {
       'runtime': runtime,
       'genre': genres,
       'is_tv_show': isTvShow,
+      'season_number': seasonNumber,
       'videoUrl': videoUrl,
+      'trailer_url': trailerUrl,
+      'content_type': contentType,
+      'is_published': isPublished,
       'local_path': localPath,
       'is_downloaded': isDownloaded,
       'file_size': fileSize,
@@ -83,7 +97,12 @@ class Movie {
       genres: json['genre'] != null ? List<String>.from(json['genre']) : null,
       contentRating: json['contentRating'],
       isTvShow: json['is_tv_show'] ?? false,
+      seasonNumber: json['season_number'] ?? (json['seasons'] != null && (json['seasons'] as List).isNotEmpty ? json['seasons'][0]['number'] : null),
       videoUrl: json['videoUrl'],
+      trailerUrl: json['trailerUrl'] ?? json['trailer_url'],
+      contentType: json['contentType'] ?? json['content_type'] ?? 'free',
+      isPublished: json['isPublished'] ?? json['is_published'] ?? true,
+      notifyUsers: json['notifyUsers'] != null ? List<String>.from(json['notifyUsers'].map((u) => u.toString())) : [],
       localPath: json['local_path'],
       isDownloaded: json['is_downloaded'] ?? false,
       isDownloading: json['is_downloading'] ?? false,
@@ -117,7 +136,11 @@ class Movie {
     int? downloadedEpisodesCount,
     String? localPath,
     String? videoUrl,
+    String? trailerUrl,
+    String? contentType,
+    bool? isPublished,
     String? fileSize,
+    int? seasonNumber,
   }) {
     return Movie(
       id: id,
@@ -134,8 +157,12 @@ class Movie {
       director: director,
       contentRating: contentRating,
       isTvShow: isTvShow,
+      seasonNumber: seasonNumber ?? this.seasonNumber,
       seasons: seasons,
       videoUrl: videoUrl ?? this.videoUrl,
+      trailerUrl: trailerUrl ?? this.trailerUrl,
+      contentType: contentType ?? this.contentType,
+      isPublished: isPublished ?? this.isPublished,
       localPath: localPath ?? this.localPath,
       isDownloaded: isDownloaded ?? this.isDownloaded,
       isDownloading: isDownloading ?? this.isDownloading,
