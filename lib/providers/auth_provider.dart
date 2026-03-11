@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:riyo/core/constants.dart';
+import 'package:riyo/models/user.dart';
 
 class AuthProvider with ChangeNotifier {
   static const String _backendUrl = Constants.apiBaseUrl;
@@ -10,11 +11,13 @@ class AuthProvider with ChangeNotifier {
   bool _isOnboardingComplete = false;
   String? _token;
   String? _role;
+  User? _user;
 
   bool get isAuthenticated => _isAuthenticated;
   bool get isOnboardingComplete => _isOnboardingComplete;
   String? get token => _token;
   String? get role => _role;
+  User? get user => _user;
 
   AuthProvider() {
     _loadState();
@@ -26,6 +29,12 @@ class AuthProvider with ChangeNotifier {
     _isOnboardingComplete = prefs.getBool('isOnboardingComplete') ?? false;
     _token = prefs.getString('token');
     _role = prefs.getString('role');
+
+    final userJson = prefs.getString('user');
+    if (userJson != null) {
+      _user = User.fromJson(jsonDecode(userJson));
+    }
+
     notifyListeners();
   }
 
@@ -40,11 +49,13 @@ class AuthProvider with ChangeNotifier {
         final data = jsonDecode(response.body);
         _token = data['token'];
         _role = data['role'];
+        _user = User.fromJson(data);
         _isAuthenticated = true;
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('isAuthenticated', true);
         await prefs.setString('token', _token!);
         await prefs.setString('role', _role!);
+        await prefs.setString('user', jsonEncode(_user!.toJson()));
         notifyListeners();
       } else {
         final errorMsg = _parseErrorMessage(response);
@@ -69,11 +80,13 @@ class AuthProvider with ChangeNotifier {
         final data = jsonDecode(response.body);
         _token = data['token'];
         _role = data['role'];
+        _user = User.fromJson(data);
         _isAuthenticated = true;
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('isAuthenticated', true);
         await prefs.setString('token', _token!);
         await prefs.setString('role', _role!);
+        await prefs.setString('user', jsonEncode(_user!.toJson()));
         notifyListeners();
       } else {
         final errorMsg = _parseErrorMessage(response);
@@ -91,10 +104,12 @@ class AuthProvider with ChangeNotifier {
     _isAuthenticated = false;
     _token = null;
     _role = null;
+    _user = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isAuthenticated', false);
     await prefs.remove('token');
     await prefs.remove('role');
+    await prefs.remove('user');
     notifyListeners();
   }
 

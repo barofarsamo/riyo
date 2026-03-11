@@ -55,9 +55,7 @@ class _MockHttpClient implements HttpClient {
   String? userAgent;
 
   @override
-  dynamic noSuchMethod(Invocation invocation) {
-    return null;
-  }
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class _MockHttpClientRequest implements HttpClientRequest {
@@ -71,9 +69,7 @@ class _MockHttpClientRequest implements HttpClientRequest {
   Future<HttpClientResponse> close() async => _MockHttpClientResponse();
 
   @override
-  dynamic noSuchMethod(Invocation invocation) {
-    return null;
-  }
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class _MockHttpClientResponse implements HttpClientResponse {
@@ -95,21 +91,17 @@ class _MockHttpClientResponse implements HttpClientResponse {
   HttpClientResponseCompressionState get compressionState => HttpClientResponseCompressionState.notCompressed;
 
   @override
-  StreamSubscription<List<int>> listen(void onData(List<int> event)?,
-      {Function? onError, void onDone()?, bool? cancelOnError}) {
+  StreamSubscription<List<int>> listen(void Function(List<int> event)? onData,
+      {Function? onError, void Function()? onDone, bool? cancelOnError}) {
     return Stream.fromIterable([_data]).listen(onData,
         onError: onError, onDone: onDone, cancelOnError: cancelOnError);
   }
 
   @override
-  dynamic noSuchMethod(Invocation invocation) {
-    return null;
-  }
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class _MockHttpHeaders implements HttpHeaders {
   @override
-  dynamic noSuchMethod(Invocation invocation) {
-    return null;
-  }
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
