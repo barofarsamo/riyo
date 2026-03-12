@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:riyo/core/design_system.dart';
+import 'package:riyo/providers/system_config_provider.dart';
 import 'package:riyo/services/api_service.dart';
 import 'package:riyo/core/casting/presentation/widgets/cast_button.dart';
 
@@ -23,12 +26,18 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
   Future<void> _loadCategories() async {
     final cats = await _apiService.getHeaderCategories();
+    final systemConfig = Provider.of<SystemConfigProvider>(context, listen: false).config;
+
     if (mounted) {
       setState(() {
-        _categories = cats;
-        // Ensure "Coming Soon" is prominent or present
+        _categories = cats.where((c) {
+          if (c == 'Sports' && !systemConfig.sportsEnabled) return false;
+          if (c == 'Kids' && !systemConfig.kidsEnabled) return false;
+          return true;
+        }).toList();
+
         if (!_categories.contains('Coming Soon')) {
-           _categories.insert(0, 'Coming Soon');
+          _categories.insert(0, 'Coming Soon');
         }
         _isLoading = false;
       });
@@ -38,19 +47,18 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF141414),
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            backgroundColor: const Color(0xFF141414),
-            title: const Text('RIYO', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 2)),
+            title: Text('Categories', style: AppTypography.titleLarge),
             actions: [
               const CastingButton(),
               IconButton(
-                icon: const Icon(Icons.settings, color: Colors.white),
+                icon: const Icon(Icons.settings_outlined),
                 onPressed: () => context.push('/settings'),
               ),
             ],
+            surfaceTintColor: Colors.transparent,
             floating: true,
             pinned: true,
           ),
@@ -60,10 +68,10 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
               child: _buildFeaturedCategoryCard(context),
             ),
           ),
-          const SliverToBoxAdapter(
+          SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
-              child: Text('EXPLORE CATEGORIES', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12),
+              child: Text('Explore Genres', style: AppTypography.titleMedium),
             ),
           ),
           if (_isLoading)
@@ -72,7 +80,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
             )
           else
             SliverPadding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
               sliver: SliverGrid(
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
@@ -98,26 +106,27 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                 ),
               ),
             ),
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
         ],
       ),
     );
   }
 
   Widget _buildFeaturedCategoryCard(BuildContext context) {
-    return Card(
+    return Container(
+      height: 200,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppTheme.cardBorderRadius),
+        image: const DecorationImage(
+          image: NetworkImage('https://picsum.photos/seed/van/800/400'),
+          fit: BoxFit.cover,
+        ),
+      ),
       clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
       child: Stack(
         alignment: Alignment.bottomLeft,
         children: [
-          Image.network(
-            'https://picsum.photos/seed/van/800/400',
-            height: 180,
-            width: double.infinity,
-            fit: BoxFit.cover,
-          ),
           Container(
-            height: 180,
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 colors: [Colors.black87, Colors.transparent],
@@ -127,22 +136,31 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(20.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('FEATURED CATEGORY', style: TextStyle(color: Colors.deepPurpleAccent, fontSize: 11, fontWeight: FontWeight.bold)),
+                Text('FEATURED',
+                  style: AppTypography.labelSmall.copyWith(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const SizedBox(height: 4),
-                const Text('ANIME HUB', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 12),
+                Text('Anime Hub',
+                  style: AppTypography.headlineMedium.copyWith(color: Colors.white),
+                ),
+                const SizedBox(height: 16),
                 ElevatedButton(
                   onPressed: () => context.push('/genre/Anime'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                    foregroundColor: Colors.black,
+                    minimumSize: const Size(100, 40),
+                    textStyle: AppTypography.labelMedium.copyWith(fontWeight: FontWeight.bold),
                   ),
-                  child: const Text('EXPLORE', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                  child: const Text('Explore'),
                 ),
               ],
             ),
@@ -155,17 +173,20 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   Widget _buildGenreCard(String name, String imageUrl) {
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(AppTheme.cardBorderRadius),
         image: DecorationImage(
           image: NetworkImage(imageUrl),
           fit: BoxFit.cover,
-          colorFilter: ColorFilter.mode(Colors.black.withAlpha(100), BlendMode.darken),
+          colorFilter: ColorFilter.mode(Colors.black.withAlpha(120), BlendMode.darken),
         ),
       ),
       child: Center(
         child: Text(
-          name.toUpperCase(),
-          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+          name,
+          style: AppTypography.titleMedium.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
     );

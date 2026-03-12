@@ -1,7 +1,9 @@
 
+import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart' as rp;
 import 'package:go_router/go_router.dart';
+import 'package:riyo/core/design_system.dart';
 import 'package:provider/provider.dart';
 import 'package:riyo/providers/settings_provider.dart';
 import 'package:riyo/providers/playback_provider.dart';
@@ -228,53 +230,41 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => HomeProvider()),
         ChangeNotifierProvider(create: (_) => SystemConfigProvider()),
       ],
-      child: Consumer<SettingsProvider>(
-        builder: (context, settings, child) {
-          final auth = Provider.of<AuthProvider>(context, listen: false);
-          return MaterialApp.router(
-            routerConfig: _createRouter(auth),
-            title: 'RIYO',
-            themeMode: settings.themeMode,
-            locale: settings.language == 'Arabic'
-                ? const Locale('ar', '')
-                : const Locale('en', ''),
-            builder: (context, child) {
-              return Directionality(
-                textDirection: settings.language == 'Arabic'
-                    ? TextDirection.rtl
-                    : TextDirection.ltr,
-                child: child!,
+      child: DynamicColorBuilder(
+        builder: (lightDynamic, darkDynamic) {
+          return Consumer<SettingsProvider>(
+            builder: (context, settings, child) {
+              final auth = Provider.of<AuthProvider>(context, listen: false);
+
+              final lightTheme = AppTheme.getLightTheme(
+                settings.dynamicColor ? lightDynamic : null,
+              );
+
+              final darkTheme = AppTheme.getDarkTheme(
+                settings.dynamicColor ? darkDynamic : null,
+                isAmoled: settings.amoledMode,
+              );
+
+              return MaterialApp.router(
+                routerConfig: _createRouter(auth),
+                title: 'RIYO',
+                themeMode: settings.themeMode,
+                locale: settings.language == 'Arabic'
+                    ? const Locale('ar', '')
+                    : const Locale('en', ''),
+                builder: (context, child) {
+                  return Directionality(
+                    textDirection: settings.language == 'Arabic'
+                        ? TextDirection.rtl
+                        : TextDirection.ltr,
+                    child: child!,
+                  );
+                },
+                theme: lightTheme,
+                darkTheme: darkTheme,
+                debugShowCheckedModeBanner: false,
               );
             },
-            theme: ThemeData(
-              useMaterial3: true,
-              brightness: Brightness.light,
-              primaryColor: Colors.deepPurple,
-              colorScheme: ColorScheme.fromSeed(
-                seedColor: Colors.deepPurple,
-                brightness: Brightness.light,
-                secondary: Colors.deepPurpleAccent,
-              ),
-            ),
-            darkTheme: ThemeData(
-              useMaterial3: true,
-              brightness: Brightness.dark,
-              primaryColor: Colors.deepPurple,
-              scaffoldBackgroundColor: const Color(0xFF1C1B1F),
-              colorScheme: const ColorScheme.dark(
-                primary: Colors.deepPurple,
-                secondary: Colors.yellow,
-                onPrimary: Colors.white,
-                onSecondary: Colors.black,
-              ),
-              bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-                backgroundColor: Color(0xFF1C1B1F),
-                selectedItemColor: Colors.yellow,
-                unselectedItemColor: Colors.grey,
-                type: BottomNavigationBarType.fixed,
-                showUnselectedLabels: true,
-              ),
-            ),
           );
         },
       ),
@@ -292,36 +282,6 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
-  int _calculateSelectedIndex(BuildContext context) {
-    final String location = GoRouterState.of(context).uri.path;
-    if (location.startsWith('/home')) return 0;
-    if (location.startsWith('/category')) return 1;
-    if (location.startsWith('/downloads')) return 2;
-    if (location.startsWith('/search')) return 3;
-    if (location.startsWith('/my-riyo')) return 4;
-    return 0; // Default
-  }
-
-  void _onItemTapped(int index, BuildContext context) {
-    switch (index) {
-      case 0:
-        context.go('/home');
-        break;
-      case 1:
-        context.go('/category');
-        break;
-      case 2:
-        context.go('/downloads');
-        break;
-      case 3:
-        context.go('/search');
-        break;
-      case 4:
-        context.go('/my-riyo');
-        break;
-    }
-  }
-
   @override
   void initState() {
     super.initState();
@@ -353,39 +313,84 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: widget.child,
-      bottomNavigationBar: BottomNavigationBar(
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
+    return Consumer<SystemConfigProvider>(
+      builder: (context, systemConfig, child) {
+        final bool downloadsEnabled = systemConfig.config.downloadsEnabled;
+
+        final List<BottomNavigationBarItem> items = [
+          const BottomNavigationBarItem(
             icon: Icon(Icons.home_outlined),
             activeIcon: Icon(Icons.home),
             label: 'Home',
           ),
-          BottomNavigationBarItem(
+          const BottomNavigationBarItem(
             icon: Icon(Icons.grid_view_outlined),
             activeIcon: Icon(Icons.grid_view),
             label: 'Categories',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.download_outlined),
-            activeIcon: Icon(Icons.download),
-            label: 'Downloads',
-          ),
-          BottomNavigationBarItem(
+          if (downloadsEnabled)
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.download_outlined),
+              activeIcon: Icon(Icons.download),
+              label: 'Downloads',
+            ),
+          const BottomNavigationBarItem(
             icon: Icon(Icons.search_outlined),
             activeIcon: Icon(Icons.search),
             label: 'Search',
           ),
-          BottomNavigationBarItem(
+          const BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),
             activeIcon: Icon(Icons.person),
             label: 'My RIYO',
           ),
-        ],
-        currentIndex: _calculateSelectedIndex(context),
-        onTap: (index) => _onItemTapped(index, context),
-      ),
+        ];
+
+        return Scaffold(
+          body: widget.child,
+          bottomNavigationBar: BottomNavigationBar(
+            items: items,
+            currentIndex: _calculateSelectedIndex(context, downloadsEnabled),
+            onTap: (index) => _onItemTapped(index, context, downloadsEnabled),
+            type: BottomNavigationBarType.fixed,
+          ),
+        );
+      },
     );
+  }
+
+  int _calculateSelectedIndex(BuildContext context, bool downloadsEnabled) {
+    final String location = GoRouterState.of(context).uri.path;
+    if (location.startsWith('/home')) return 0;
+    if (location.startsWith('/category')) return 1;
+    if (location.startsWith('/downloads')) return downloadsEnabled ? 2 : 0;
+    if (location.startsWith('/search')) return downloadsEnabled ? 3 : 2;
+    if (location.startsWith('/my-riyo')) return downloadsEnabled ? 4 : 3;
+    return 0;
+  }
+
+  void _onItemTapped(int index, BuildContext context, bool downloadsEnabled) {
+    int targetIndex = index;
+    if (!downloadsEnabled && index >= 2) {
+      targetIndex = index + 1;
+    }
+
+    switch (targetIndex) {
+      case 0:
+        context.go('/home');
+        break;
+      case 1:
+        context.go('/category');
+        break;
+      case 2:
+        context.go('/downloads');
+        break;
+      case 3:
+        context.go('/search');
+        break;
+      case 4:
+        context.go('/my-riyo');
+        break;
+    }
   }
 }
