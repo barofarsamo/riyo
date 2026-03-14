@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
-import { Play, Info, Plus, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Play, Info, Plus, ChevronRight, ChevronLeft, Star, Volume2, Maximize, RotateCcw } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const Home = () => {
-  const [movies, setMovies] = useState([]);
+  const [sections, setSections] = useState([]);
   const [featured, setFeatured] = useState(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -12,14 +13,23 @@ const Home = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await api.get('/movies?limit=50');
-        const moviesData = res.data.movies || [];
-        setMovies(moviesData);
-        if (moviesData.length > 0) {
-          setFeatured(moviesData[Math.floor(Math.random() * moviesData.length)]);
+        const res = await api.get('/api/v1/home');
+        const data = res.data;
+
+        const sectionList = [
+          { title: "Trending Now", movies: data.trendingMovies },
+          { title: "Top Rated Collections", movies: data.topRatedMovies },
+          { title: "Most Popular", movies: data.popularMovies },
+          { title: "Must Watch Series", movies: data.trendingTV },
+        ];
+
+        setSections(sectionList.filter(s => s.movies && s.movies.length > 0));
+
+        if (data.trendingMovies?.length > 0) {
+          setFeatured(data.trendingMovies[0]);
         }
       } catch (err) {
-        console.error(err);
+        console.error("Error fetching home data:", err);
       } finally {
         setLoading(false);
       }
@@ -27,65 +37,87 @@ const Home = () => {
     fetchData();
   }, []);
 
-  if (loading) return <div className="h-screen flex items-center justify-center">
-    <div className="w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
-  </div>;
+  if (loading) return <HomeSkeleton />;
 
   return (
-    <div className="pb-20">
-      {/* Hero Section */}
+    <div className="min-h-screen bg-[#050505] pb-20">
+      {/* Cinematic Hero */}
       {featured && (
-        <div className="relative h-[80vh] md:h-[95vh] w-full overflow-hidden">
-          <div className="absolute inset-0">
+        <section className="relative h-[110vh] w-full overflow-hidden flex items-center">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 1 }}
+            className="absolute inset-0 z-0"
+          >
             <img
               src={featured.backdropUrl || featured.posterUrl}
-              className="w-full h-full object-cover"
-              alt={featured.title}
+              className="w-full h-full object-cover scale-105"
+              alt=""
             />
-            <div className="absolute inset-0 hero-gradient"></div>
-            <div className="absolute inset-0 bg-gradient-to-r from-[#141414] via-[#141414]/20 to-transparent"></div>
-          </div>
+            <div className="absolute inset-0 hero-gradient-bottom"></div>
+            <div className="absolute inset-0 hero-gradient-left"></div>
+          </motion.div>
 
-          <div className="absolute bottom-20 md:bottom-40 left-4 md:left-12 max-w-2xl px-4">
-            <h1 className="text-4xl md:text-7xl font-black mb-4 uppercase leading-tight tracking-tighter">
-              {featured.title}
-            </h1>
-            <p className="text-sm md:text-lg text-gray-200 mb-8 line-clamp-3 md:line-clamp-none font-medium">
-              {featured.description}
-            </p>
-            <div className="flex space-x-4">
-              <button
-                onClick={() => navigate(`/watch/${featured._id}`)}
-                className="flex items-center space-x-3 bg-white text-black px-6 md:px-8 py-2 md:py-3 rounded hover:bg-white/90 transition-colors font-bold"
-              >
-                <Play fill="black" />
-                <span>Play</span>
-              </button>
-              <button
-                onClick={() => navigate(`/movie/${featured._id}`)}
-                className="flex items-center space-x-3 bg-gray-500/50 text-white px-6 md:px-8 py-2 md:py-3 rounded hover:bg-gray-500/40 transition-colors font-bold backdrop-blur-md"
-              >
-                <Info />
-                <span>More Info</span>
-              </button>
-            </div>
+          <div className="relative z-10 w-full px-6 md:px-16 pt-20">
+             <motion.div
+               initial={{ opacity: 0, y: 30 }}
+               animate={{ opacity: 1, y: 0 }}
+               transition={{ delay: 0.3, duration: 0.8 }}
+               className="max-w-3xl"
+             >
+                <div className="flex items-center space-x-3 mb-8">
+                    <span className="bg-white/10 backdrop-blur-md border border-white/10 px-4 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-[0.2em]">Featured Release</span>
+                    <div className="flex items-center text-yellow-400 font-black text-sm">
+                        <Star size={16} fill="currentColor" className="mr-1.5" />
+                        <span>{featured.rating?.toFixed(1) || '8.5'}</span>
+                    </div>
+                </div>
+
+                <h1 className="text-7xl md:text-9xl font-black mb-8 leading-[0.85] tracking-tighter">
+                  {featured.title.split(' ').map((word, i) => (
+                    <span key={i} className={i % 2 === 0 ? 'text-white' : 'text-purple-600'}>{word} </span>
+                  ))}
+                </h1>
+
+                <p className="text-lg md:text-xl text-slate-300 mb-12 line-clamp-3 font-medium max-w-xl leading-relaxed">
+                  {featured.description}
+                </p>
+
+                <div className="flex flex-wrap items-center gap-6">
+                  <button
+                    onClick={() => navigate(`/watch/${featured._id || featured.id}`)}
+                    className="flex items-center space-x-4 bg-white text-black px-12 py-5 rounded-2xl hover:bg-purple-600 hover:text-white transition-all duration-500 font-black uppercase tracking-widest shadow-[0_15px_40px_rgba(255,255,255,0.1)] hover:scale-105 active:scale-95"
+                  >
+                    <Play fill="currentColor" size={24} />
+                    <span>Watch Now</span>
+                  </button>
+                  <button
+                    onClick={() => navigate(`/movie/${featured._id || featured.id}`)}
+                    className="flex items-center space-x-4 glass text-white px-10 py-5 rounded-2xl hover:bg-white/10 transition-all duration-500 font-black uppercase tracking-widest border border-white/10"
+                  >
+                    <Info size={24} />
+                    <span>Details</span>
+                  </button>
+                </div>
+             </motion.div>
           </div>
-        </div>
+        </section>
       )}
 
-      {/* Movie Rows */}
-      <div className="mt-[-80px] md:mt-[-150px] relative z-10 space-y-12 pl-4 md:pl-12 overflow-x-hidden">
-        <MovieRow title="Trending Now" movies={movies} />
-        <MovieRow title="New Releases" movies={[...movies].reverse()} />
-        <MovieRow title="Popular on RIYO" movies={movies.filter(m => m.isTrending)} />
+      {/* Modern Horizontal Grids */}
+      <div className="relative z-20 -mt-40 space-y-24">
+        {sections.map((section, idx) => (
+          <SectionRow key={idx} title={section.title} movies={section.movies} index={idx} />
+        ))}
       </div>
     </div>
   );
 };
 
-const MovieRow = ({ title, movies }) => {
+const SectionRow = ({ title, movies, index }) => {
   const navigate = useNavigate();
-  const rowRef = React.useRef(null);
+  const rowRef = useRef(null);
 
   const slide = (direction) => {
     if (rowRef.current) {
@@ -95,61 +127,75 @@ const MovieRow = ({ title, movies }) => {
     }
   };
 
-  if (movies.length === 0) return null;
-
   return (
-    <div className="group relative">
-      <h2 className="text-xl md:text-2xl font-bold mb-4 flex items-center group-hover:text-white transition-colors cursor-pointer">
-        {title}
-        <ChevronRight size={20} className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity" />
-      </h2>
+    <div className="px-6 md:px-16 overflow-hidden">
+      <div className="flex items-end justify-between mb-8">
+        <h2 className="text-2xl md:text-4xl font-black text-white/90 tracking-tighter">
+          {title}
+        </h2>
+        <div className="flex space-x-3">
+           <button onClick={() => slide('left')} className="p-3 bg-white/5 rounded-2xl hover:bg-purple-600 transition-all border border-white/5">
+              <ChevronLeft size={20} />
+           </button>
+           <button onClick={() => slide('right')} className="p-3 bg-white/5 rounded-2xl hover:bg-purple-600 transition-all border border-white/5">
+              <ChevronRight size={20} />
+           </button>
+        </div>
+      </div>
 
-      <div className="relative">
-        <button
-          onClick={() => slide('left')}
-          className="absolute left-[-40px] top-0 bottom-0 z-40 bg-black/50 hover:bg-black/80 px-2 opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          <ChevronLeft />
-        </button>
-
-        <div
-          ref={rowRef}
-          className="flex space-x-2 md:space-x-4 overflow-x-scroll scrollbar-hide pr-20"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-        >
-          {movies.map((movie) => (
-            <div
-              key={movie._id}
-              onClick={() => navigate(`/movie/${movie._id}`)}
-              className="flex-none w-32 md:w-56 aspect-[2/3] md:aspect-video relative rounded-md overflow-hidden cursor-pointer transform hover:scale-105 transition-transform duration-300 group/item shadow-lg"
-            >
-              <img
+      <div
+        ref={rowRef}
+        className="flex space-x-6 overflow-x-scroll scrollbar-hide pb-10"
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      >
+        {movies.map((movie) => (
+          <motion.div
+            key={movie._id || movie.id}
+            whileHover={{ y: -15 }}
+            onClick={() => navigate(`/movie/${movie._id || movie.id}`)}
+            className="flex-none w-48 md:w-80 group cursor-pointer"
+          >
+            <div className="relative aspect-[2/3] md:aspect-video rounded-[1.5rem] overflow-hidden shadow-2xl border border-white/5 transition-all duration-500 group-hover:border-purple-600 group-hover:shadow-[0_0_50px_rgba(139,92,246,0.3)]">
+               <img
                 src={movie.posterUrl}
-                className="w-full h-full object-cover"
-                alt={movie.title}
+                className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
+                alt=""
                 loading="lazy"
               />
-              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/item:opacity-100 transition-opacity flex flex-col justify-end p-4">
-                <h3 className="font-bold text-sm md:text-base mb-1 truncate">{movie.title}</h3>
-                <div className="flex items-center space-x-2 text-[10px] md:text-xs text-gray-300">
-                  <span className="text-green-500 font-bold">98% Match</span>
-                  <span>{movie.year}</span>
-                  <span className="border border-white/40 px-1 rounded text-[8px]">{movie.contentRating || '13+'}</span>
-                </div>
+
+              <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-all duration-500 flex flex-col justify-end p-6 backdrop-blur-md">
+                  <div className="flex items-center space-x-2 mb-3">
+                      <div className="bg-purple-600 px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest">Ultra HD</div>
+                      <div className="flex items-center text-yellow-400 text-[10px] font-bold">
+                        <Star size={12} fill="currentColor" className="mr-1" />
+                        <span>{movie.rating?.toFixed(1) || '8.5'}</span>
+                      </div>
+                  </div>
+                  <h3 className="font-black text-lg mb-2 uppercase leading-tight line-clamp-1">{movie.title}</h3>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-5">{movie.year} • Action • Sci-Fi</p>
+
+                  <div className="flex space-x-3">
+                    <button className="flex-1 bg-white text-black py-3 rounded-xl font-black uppercase tracking-widest text-[9px] hover:bg-purple-600 hover:text-white transition-all">Play</button>
+                    <button className="p-3 bg-white/10 rounded-xl hover:bg-white/20 transition-all">
+                        <Plus size={18} />
+                    </button>
+                  </div>
               </div>
             </div>
-          ))}
-        </div>
-
-        <button
-          onClick={() => slide('right')}
-          className="absolute right-0 top-0 bottom-0 z-40 bg-black/50 hover:bg-black/80 px-2 opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          <ChevronRight />
-        </button>
+          </motion.div>
+        ))}
       </div>
     </div>
   );
 };
+
+const HomeSkeleton = () => (
+    <div className="h-screen bg-[#050505] p-16 space-y-12">
+        <div className="h-2/3 w-full skeleton rounded-[3rem]"></div>
+        <div className="flex space-x-8 overflow-hidden">
+            {[1, 2, 3, 4].map(i => <div key={i} className="flex-none w-80 aspect-video skeleton rounded-3xl"></div>)}
+        </div>
+    </div>
+);
 
 export default Home;

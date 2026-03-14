@@ -16,12 +16,15 @@ import 'package:riyo/core/casting/presentation/widgets/cast_button.dart';
 import 'package:riyo/core/casting/presentation/providers/casting_provider.dart';
 import 'package:riyo/core/casting/domain/entities/cast_media.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart' as rp;
+import 'package:webview_flutter/webview_flutter.dart';
 
 class VideoPlayerScreen extends rp.ConsumerStatefulWidget {
   final String? movieId;
   final String? videoUrl;
+  final int? season;
+  final int? episode;
 
-  const VideoPlayerScreen({super.key, this.movieId, this.videoUrl});
+  const VideoPlayerScreen({super.key, this.movieId, this.videoUrl, this.season, this.episode});
 
   @override
   rp.ConsumerState<VideoPlayerScreen> createState() => _VideoPlayerScreenState();
@@ -30,6 +33,7 @@ class VideoPlayerScreen extends rp.ConsumerStatefulWidget {
 class _VideoPlayerScreenState extends rp.ConsumerState<VideoPlayerScreen> {
   RiyoVideoEngine? _engine;
   int? _textureId;
+  WebViewController? _webController;
   bool _isControlsVisible = true;
   Timer? _hideControlsTimer;
   double _currentVolume = 0.5;
@@ -38,20 +42,71 @@ class _VideoPlayerScreenState extends rp.ConsumerState<VideoPlayerScreen> {
   String _selectedQuality = 'Auto';
   String _selectedAudio = 'English';
   String _selectedSubtitle = 'Off';
-  bool _isBuffering = false;
+
+  Movie? _movie;
+  List<Map<String, dynamic>> _sources = [];
+  Map<String, dynamic>? _selectedSource;
+  int _currentSourceIndex = 0;
+  bool _isError = false;
+
+  // Real-time tracking
+  double _position = 0;
+  double _duration = 1;
+  double _bufferPosition = 0;
+  Timer? _playbackTimer;
 
   @override
   void initState() {
     super.initState();
     WakelockPlus.enable();
-    _initPlayer();
+    _fetchData();
     _initVolume();
     _initBrightness();
     _initCastListener();
+    _startPlaybackTimer();
+  }
+
+  void _startPlaybackTimer() {
+    _playbackTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
+      if (_engine != null && _engine!.getState() == 2) {
+         setState(() {
+           // These values would normally come from the native engine
+           _position = _engine!.getPosition();
+           _duration = _engine!.getDuration();
+           if (_duration <= 0) _duration = 1;
+         });
+      }
+    });
+  }
+
+  Future<void> _fetchData() async {
+    final apiService = ApiService();
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+
+    if (widget.movieId != null) {
+      try {
+        _movie = await apiService.getMovieDetails(widget.movieId!, token: auth.token);
+        final response = await apiService.getSources(widget.movieId!, season: widget.season, episode: widget.episode);
+        _sources = List<Map<String, dynamic>>.from(response['sources']);
+
+        if (_sources.isNotEmpty) {
+           _currentSourceIndex = 0;
+           _selectedSource = _sources[_currentSourceIndex];
+        }
+
+        if (mounted) {
+          _initPlayer();
+        }
+      } catch (e) {
+        debugPrint('Error fetching player data: $e');
+        setState(() => _isError = true);
+      }
+    } else if (widget.videoUrl != null) {
+       _initPlayer();
+    }
   }
 
   void _initCastListener() {
-    // Listen for cast connection
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.listenManual(castingProvider, (previous, next) {
         if (next.connectedDevice != null && _engine != null && _engine!.getState() == 2) {
@@ -63,17 +118,9 @@ class _VideoPlayerScreenState extends rp.ConsumerState<VideoPlayerScreen> {
 
   Future<void> _startCasting() async {
     final castingNotifier = ref.read(castingProvider.notifier);
-    final auth = Provider.of<AuthProvider>(context, listen: false);
-    String? url = widget.videoUrl;
-    String? title = "Video";
-    String? poster;
-
-    if (widget.movieId != null) {
-      final movie = await ApiService().getMovieDetails(widget.movieId!, token: auth.token);
-      url = movie.videoUrl;
-      title = movie.title;
-      poster = movie.posterPath.startsWith('http') ? movie.posterPath : 'https://image.tmdb.org/t/p/w500${movie.posterPath}';
-    }
+    String? url = _selectedSource?['url'] ?? widget.videoUrl;
+    String? title = _movie?.title ?? "Video";
+    String? poster = _movie != null ? (_movie!.posterPath.startsWith('http') ? _movie!.posterPath : 'https://image.tmdb.org/t/p/w500${_movie!.posterPath}') : null;
 
     if (url != null) {
       _engine?.pause();
@@ -82,38 +129,28 @@ class _VideoPlayerScreenState extends rp.ConsumerState<VideoPlayerScreen> {
         title: title,
         posterUrl: poster,
       ));
-      if (mounted) {
-        final deviceName = ref.read(castingProvider).connectedDevice?.name;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Casting to $deviceName'))
-        );
-      }
     }
   }
 
   Future<void> _initPlayer() async {
-    String? url = widget.videoUrl;
+    String? url = _selectedSource?['url'] ?? widget.videoUrl;
+    if (url == null) return;
 
-    if (url == null && widget.movieId != null) {
-      if (!mounted) return;
-      try {
-        final auth = Provider.of<AuthProvider>(context, listen: false);
-        final token = auth.token;
-        final movie = await ApiService().getMovieDetails(widget.movieId!, token: token);
-        if (!mounted) return;
-        url = movie.videoUrl;
-      } catch (e) {
-        debugPrint('Error fetching movie details: $e');
-      }
+    if (_selectedSource?['type'] == 'embed') {
+      _engine?.dispose();
+      _engine = null;
+      _webController = WebViewController()
+        ..setJavaScriptMode(JavaScriptMode.unrestricted)
+        ..setBackgroundColor(const Color(0x00000000))
+        ..loadRequest(Uri.parse(url));
+      if (mounted) setState(() {});
+      return;
     }
 
-    url ??= 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
-
+    _engine?.dispose();
     _engine = RiyoVideoEngine();
     _textureId = await TextureRegistryBridge.createTexture();
 
-    // In a real app, we'd pass _textureId to the native engine here
-    // to link the Surface/Texture. For now, we load the URL.
     _engine!.load(url);
     _engine!.setEventCallback();
     _engine!.play();
@@ -124,23 +161,28 @@ class _VideoPlayerScreenState extends rp.ConsumerState<VideoPlayerScreen> {
     }
   }
 
+  void _handleSourceError() {
+    if (_currentSourceIndex + 1 < _sources.length) {
+      _currentSourceIndex++;
+      _selectedSource = _sources[_currentSourceIndex];
+      _initPlayer();
+    } else {
+      setState(() => _isError = true);
+    }
+  }
+
   Future<void> _initVolume() async {
     _currentVolume = await FlutterVolumeController.getVolume() ?? 0.5;
-    if (mounted) {
-      setState(() {});
-    }
+    if (mounted) setState(() {});
   }
 
   Future<void> _initBrightness() async {
     try {
       _currentBrightness = await ScreenBrightness().application;
     } catch (e) {
-      debugPrint('Failed to get current brightness: $e');
       _currentBrightness = 0.5;
     }
-    if (mounted) {
-      setState(() {});
-    }
+    if (mounted) setState(() {});
   }
 
   void _toggleControls() {
@@ -150,37 +192,6 @@ class _VideoPlayerScreenState extends rp.ConsumerState<VideoPlayerScreen> {
     if (_isControlsVisible) {
       _startHideControlsTimer();
     }
-  }
-
-  void _showResumeDialog(Duration progress) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: const Color(0xFF2A2A3A),
-        title: const Text('CONTINUE WATCHING', style: TextStyle(color: Colors.yellow, fontSize: 16)),
-        content: Text('Resume from ${_formatDuration(progress)}?', style: const TextStyle(color: Colors.white)),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Provider.of<PlaybackProvider>(context, listen: false).resetProgress(widget.movieId ?? '');
-              _engine?.play();
-              Navigator.pop(dialogContext);
-            },
-            child: const Text('Restart', style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              _engine?.seek(progress.inSeconds.toDouble());
-              _engine?.play();
-              Navigator.pop(dialogContext);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.yellow),
-            child: const Text('Resume', style: TextStyle(color: Colors.black)),
-          ),
-        ],
-      ),
-    );
   }
 
   void _startHideControlsTimer() {
@@ -196,9 +207,7 @@ class _VideoPlayerScreenState extends rp.ConsumerState<VideoPlayerScreen> {
 
   @override
   void dispose() {
-    if (widget.movieId != null && _engine != null) {
-      // Provider.of<PlaybackProvider>(context, listen: false).updateProgress(widget.movieId!, _engine!.getPosition());
-    }
+    _playbackTimer?.cancel();
     WakelockPlus.disable();
     _engine?.dispose();
     if (_textureId != null) {
@@ -210,63 +219,50 @@ class _VideoPlayerScreenState extends rp.ConsumerState<VideoPlayerScreen> {
 
   void _seekRelative(Duration duration) {
     if (_engine == null) return;
-    _engine!.seek(duration.inSeconds.toDouble());
+    final target = (_position + duration.inSeconds).clamp(0, _duration);
+    _engine!.seek(target.toDouble());
     _startHideControlsTimer();
-
-    // Show a quick visual indicator
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(duration.isNegative ? 'Seek -10s' : 'Seek +10s'),
-        duration: const Duration(milliseconds: 500),
-        behavior: SnackBarBehavior.floating,
-        width: 100,
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isError) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, color: Colors.red, size: 64),
+              const SizedBox(height: 16),
+              const Text('All streaming sources failed.', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
+                child: const Text('Go Back'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: GestureDetector(
         onTap: _toggleControls,
-        onDoubleTapDown: (details) {
-          if (details.localPosition.dx < MediaQuery.of(context).size.width / 2) {
-             _seekRelative(const Duration(seconds: -10));
-          } else {
-             _seekRelative(const Duration(seconds: 10));
-          }
-        },
-        onVerticalDragUpdate: (details) {
-          if (details.localPosition.dx < MediaQuery.of(context).size.width / 2) {
-            // Brightness
-            _currentBrightness = (_currentBrightness - details.delta.dy / 100).clamp(0.0, 1.0);
-            ScreenBrightness().setApplicationScreenBrightness(_currentBrightness);
-          } else {
-            // Volume
-            _currentVolume = (_currentVolume - details.delta.dy / 100).clamp(0.0, 1.0);
-            FlutterVolumeController.setVolume(_currentVolume);
-          }
-          setState(() {});
-          _startHideControlsTimer();
-        },
         child: Stack(
           children: <Widget>[
             Center(
-              child: (_textureId != null)
-                  ? Texture(textureId: _textureId!)
-                  : const CircularProgressIndicator(color: Colors.yellow),
+              child: _selectedSource?['type'] == 'embed'
+                  ? (_webController != null
+                      ? WebViewWidget(controller: _webController!)
+                      : const CircularProgressIndicator(color: Colors.yellow))
+                  : (_textureId != null)
+                      ? Texture(textureId: _textureId!)
+                      : const CircularProgressIndicator(color: Colors.yellow),
             ),
-            if (_isBuffering)
-              const Center(child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                   CircularProgressIndicator(color: Colors.yellow),
-                   SizedBox(height: 8),
-                   Text('Buffering...', style: TextStyle(color: Colors.white)),
-                ],
-              )),
             if (_isControlsVisible) _buildControls(),
           ],
         ),
@@ -276,13 +272,19 @@ class _VideoPlayerScreenState extends rp.ConsumerState<VideoPlayerScreen> {
 
   Widget _buildControls() {
     return Container(
-      color: Colors.black45,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Colors.black.withOpacity(0.7), Colors.transparent, Colors.black.withOpacity(0.7)],
+        ),
+      ),
       child: SafeArea(
         child: Column(
           children: [
             _buildTopBar(),
             const Spacer(),
-            _buildPlaybackControls(),
+            if (_selectedSource?['type'] != 'embed') _buildPlaybackControls(),
             const Spacer(),
             _buildBottomBar(),
           ],
@@ -293,22 +295,30 @@ class _VideoPlayerScreenState extends rp.ConsumerState<VideoPlayerScreen> {
 
   Widget _buildTopBar() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
             onPressed: () => Navigator.of(context).pop(),
           ),
-          const Expanded(
-            child: Text(
-              'Movie Playing',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-              overflow: TextOverflow.ellipsis,
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _movie?.title ?? 'Loading...',
+                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (widget.season != null)
+                   Text('Season ${widget.season} • Episode ${widget.episode}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+              ],
             ),
           ),
           const CastingButton(),
-          IconButton(icon: const Icon(Icons.more_vert, color: Colors.white), onPressed: () => _showSettingsMenu()),
+          IconButton(icon: const Icon(Icons.more_vert_rounded, color: Colors.white), onPressed: () => _showSettingsMenu()),
         ],
       ),
     );
@@ -316,23 +326,20 @@ class _VideoPlayerScreenState extends rp.ConsumerState<VideoPlayerScreen> {
 
   Widget _buildPlaybackControls() {
     if (_engine == null) return const SizedBox();
-    final isPlaying = _engine!.getState() == 2; // Assuming 2 is PLAYING
+    final isPlaying = _engine!.getState() == 2;
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         IconButton(
-          icon: const Icon(Icons.replay_10, color: Colors.white, size: 40),
-          onPressed: () {
-            _engine!.seek(-10); // Native engine should handle relative seek or we track position
-            _startHideControlsTimer();
-          },
+          icon: const Icon(Icons.replay_10_rounded, color: Colors.white, size: 48),
+          onPressed: () => _seekRelative(const Duration(seconds: -10)),
         ),
-        const SizedBox(width: 40),
+        const SizedBox(width: 48),
         IconButton(
           icon: Icon(
-            isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
-            color: Colors.yellow,
-            size: 80,
+            isPlaying ? Icons.pause_circle_filled_rounded : Icons.play_circle_filled_rounded,
+            color: Colors.purple,
+            size: 96,
           ),
           onPressed: () {
             setState(() {
@@ -341,48 +348,59 @@ class _VideoPlayerScreenState extends rp.ConsumerState<VideoPlayerScreen> {
             });
           },
         ),
-        const SizedBox(width: 40),
+        const SizedBox(width: 48),
         IconButton(
-          icon: const Icon(Icons.forward_10, color: Colors.white, size: 40),
-          onPressed: () {
-            _engine!.seek(10);
-            _startHideControlsTimer();
-          },
+          icon: const Icon(Icons.forward_10_rounded, color: Colors.white, size: 48),
+          onPressed: () => _seekRelative(const Duration(seconds: 10)),
         ),
       ],
     );
   }
 
   Widget _buildBottomBar() {
-    if (_engine == null) return const SizedBox();
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(24.0),
       child: Column(
         children: [
-           // Replace with native progress indicator if needed,
-           // or use a custom slider that calls _engine!.seek()
-           Slider(
-             value: 0.2, // Mock position
-             onChanged: (val) {
-               _engine!.seek(val * 100); // Mock duration 100s
-             },
-             activeColor: Colors.yellow,
-             inactiveColor: Colors.white24,
-           ),
-          const SizedBox(height: 8),
+          if (_selectedSource?['type'] != 'embed')
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Column(
+                children: [
+                   SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 2,
+                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                      overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+                      activeTrackColor: Colors.purple,
+                      inactiveTrackColor: Colors.white24,
+                      thumbColor: Colors.white,
+                    ),
+                    child: Slider(
+                      value: _position,
+                      max: _duration,
+                      onChanged: (val) {
+                        setState(() => _position = val);
+                        _engine!.seek(val);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                '00:20 / 05:00', // Mock
-                style: TextStyle(color: Colors.white, fontSize: 12),
+              Text(
+                _selectedSource?['type'] == 'embed' ? 'EXTERNAL SERVER' : '${_formatDuration(Duration(seconds: _position.toInt()))} / ${_formatDuration(Duration(seconds: _duration.toInt()))}',
+                style: const TextStyle(color: Colors.white60, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2),
               ),
               Row(
                 children: [
-                  _buildControlItem(Icons.speed, '${_playbackSpeed}x', _showSpeedMenu),
-                  _buildControlItem(Icons.high_quality, _selectedQuality, _showQualityMenu),
-                  _buildControlItem(Icons.language, _selectedAudio, _showAudioMenu),
-                  _buildControlItem(Icons.subtitles, _selectedSubtitle, _showSubtitleMenu),
+                  _buildControlItem(Icons.dns_rounded, _selectedSource?['label'] ?? 'SERVER', _showSourceMenu),
+                  if (_selectedSource?['type'] != 'embed')
+                    _buildControlItem(Icons.speed_rounded, '${_playbackSpeed}x', _showSpeedMenu),
+                  _buildControlItem(Icons.high_quality_rounded, _selectedQuality, _showQualityMenu),
                 ],
               ),
             ],
@@ -392,89 +410,89 @@ class _VideoPlayerScreenState extends rp.ConsumerState<VideoPlayerScreen> {
     );
   }
 
+  String _formatDuration(Duration d) {
+    final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return "${d.inHours > 0 ? '${d.inHours}:' : ''}$minutes:$seconds";
+  }
+
   Widget _buildControlItem(IconData icon, String label, VoidCallback onTap) {
     return Padding(
-      padding: const EdgeInsets.only(left: 16),
-      child: GestureDetector(
+      padding: const EdgeInsets.only(left: 24),
+      child: InkWell(
         onTap: onTap,
         child: Column(
           children: [
-            Icon(icon, color: Colors.white, size: 20),
-            Text(label, style: const TextStyle(color: Colors.white, fontSize: 10)),
+            Icon(icon, color: Colors.white, size: 24),
+            const SizedBox(height: 4),
+            Text(label.toUpperCase(), style: const TextStyle(color: Colors.white60, fontSize: 8, fontWeight: FontWeight.w900)),
           ],
         ),
       ),
     );
   }
 
+  void _showSourceMenu() {
+    _showBottomDialog('SELECT SERVER', _sources.map((s) => s['label'].toString()).toList(), (val) {
+      final index = _sources.indexWhere((s) => s['label'] == val);
+      setState(() {
+        _currentSourceIndex = index;
+        _selectedSource = _sources[index];
+        _initPlayer();
+      });
+    });
+  }
+
   void _showSpeedMenu() {
-    _showBottomDialog('Playback Speed', ['0.5x', '0.75x', '1.0x', '1.25x', '1.5x', '2.0x'], (val) {
+    _showBottomDialog('PLAYBACK SPEED', ['0.5x', '1.0x', '1.5x', '2.0x'], (val) {
       setState(() {
         _playbackSpeed = double.parse(val.replaceAll('x', ''));
-        // RiyoVideoEngine could have a setSpeed method if needed
-        // _engine?.setSpeed(_playbackSpeed);
       });
     });
   }
 
   void _showQualityMenu() {
-    _showBottomDialog('Video Quality', ['Auto', '480p', '720p', '1080p', '4K'], (val) {
+    _showBottomDialog('VIDEO QUALITY', ['AUTO', '720P', '1080P', '4K'], (val) {
       setState(() => _selectedQuality = val);
     });
   }
 
-  void _showAudioMenu() {
-    _showBottomDialog('Audio Track', ['English', 'Somali', 'Arabic', 'French', 'Spanish'], (val) {
-      setState(() => _selectedAudio = val);
-    });
-  }
-
-  void _showSubtitleMenu() {
-    _showBottomDialog('Subtitles', ['Off', 'English', 'Somali', 'Arabic', 'French'], (val) {
-      setState(() => _selectedSubtitle = val);
-    });
-  }
-
   void _showSettingsMenu() {
-    _showBottomDialog('Settings', ['Auto-play next', 'Skip Intro', 'Skip Credits'], (val) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$val toggled')));
-    });
+    _showBottomDialog('PLAYER SETTINGS', ['AUTO-PLAY NEXT', 'SKIP INTRO', 'SKIP CREDITS'], (val) {});
   }
 
   void _showBottomDialog(String title, List<String> options, Function(String) onSelect) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF2A2A3A),
+      backgroundColor: Theme.of(context).cardColor,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
       builder: (context) => Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: const TextStyle(color: Colors.yellow, fontWeight: FontWeight.bold, fontSize: 18)),
-            const SizedBox(height: 16),
-            ...options.map((opt) => ListTile(
-              title: Text(opt, style: const TextStyle(color: Colors.white)),
-              onTap: () {
-                onSelect(opt);
-                Navigator.pop(context);
-              },
-            )),
+            Text(title, style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 2)),
+            const SizedBox(height: 24),
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: options.length,
+                separatorBuilder: (c, i) => Divider(color: Theme.of(context).dividerColor),
+                itemBuilder: (context, index) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(options[index], style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color, fontWeight: FontWeight.bold)),
+                  trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+                  onTap: () {
+                    onSelect(options[index]);
+                    Navigator.pop(context);
+                  },
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
-  }
-
-  String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final hours = duration.inHours;
-    final minutes = duration.inMinutes.remainder(60);
-    final seconds = duration.inSeconds.remainder(60);
-    if (hours > 0) {
-      return '${twoDigits(hours)}:${twoDigits(minutes)}:${twoDigits(seconds)}';
-    } else {
-      return '${twoDigits(minutes)}:${twoDigits(seconds)}';
-    }
   }
 }

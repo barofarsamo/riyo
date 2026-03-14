@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:riyo/providers/settings_provider.dart';
 import 'package:riyo/presentation/screens/settings/settings_widgets.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 class LanguageSettingsScreen extends StatelessWidget {
   const LanguageSettingsScreen({super.key});
@@ -11,11 +12,8 @@ class LanguageSettingsScreen extends StatelessWidget {
     final settings = Provider.of<SettingsProvider>(context);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F0F0F),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0F0F0F),
-        title: const Text('Language', style: TextStyle(color: Colors.white)),
-        iconTheme: const IconThemeData(color: Colors.white),
+        title: Text('language_select'.tr()),
       ),
       body: ListView(
         children: [
@@ -24,7 +22,7 @@ class LanguageSettingsScreen extends StatelessWidget {
             icon: Icons.language_outlined,
             title: 'App Language',
             subtitle: settings.appLanguage,
-            onTap: () => _showDialog(context, 'App Language', ['English', 'Somali', 'Arabic', 'Spanish'], settings.appLanguage, (val) => settings.setAppLanguage(val)),
+            onTap: () => _showLanguageDialog(context, settings),
           ),
 
           const SettingsHeader(title: 'Content'),
@@ -45,23 +43,52 @@ class LanguageSettingsScreen extends StatelessWidget {
     );
   }
 
+  void _showLanguageDialog(BuildContext context, SettingsProvider settings) {
+    final languages = {
+      'English': const Locale('en'),
+      'Somali': const Locale('so'),
+      'Arabic': const Locale('ar'),
+      'Spanish': const Locale('es'),
+    };
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('language_select'.tr()),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: languages.keys.map((lang) => RadioListTile<String>(
+            title: Text(lang),
+            value: lang,
+            groupValue: settings.appLanguage,
+            onChanged: (val) {
+              settings.setAppLanguage(val!);
+              context.setLocale(languages[val]!);
+              Navigator.pop(context);
+            },
+            activeColor: Theme.of(context).colorScheme.primary,
+          )).toList(),
+        ),
+      ),
+    );
+  }
+
   void _showDialog(BuildContext context, String title, List<String> options, String current, ValueChanged<String> onSelected) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1C1C1C),
-        title: Text(title, style: const TextStyle(color: Colors.white)),
+        title: Text(title),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: options.map((opt) => RadioListTile<String>(
-            title: Text(opt, style: const TextStyle(color: Colors.white)),
+            title: Text(opt),
             value: opt,
             groupValue: current,
             onChanged: (val) {
               onSelected(val!);
               Navigator.pop(context);
             },
-            activeColor: Theme.of(context).primaryColor,
+            activeColor: Theme.of(context).colorScheme.primary,
           )).toList(),
         ),
       ),

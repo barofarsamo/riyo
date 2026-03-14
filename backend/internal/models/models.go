@@ -53,10 +53,11 @@ type VideoJob struct {
 }
 
 type Episode struct {
-	Number   int    `bson:"number" json:"number"`
-	Title    string `bson:"title" json:"title"`
-	Duration string `bson:"duration" json:"duration"`
-	VideoURL string `bson:"videoUrl" json:"videoUrl"`
+	Number   int            `bson:"number" json:"number"`
+	Title    string         `bson:"title" json:"title"`
+	Duration string         `bson:"duration" json:"duration"`
+	VideoURL string         `bson:"videoUrl" json:"videoUrl"` // Direct link or fallback
+	Sources  []StreamSource `bson:"sources" json:"sources"`
 }
 
 type Season struct {
@@ -69,11 +70,13 @@ type StreamSource struct {
 	Label    string `bson:"label" json:"label"`       // Primary, Backup 1, etc.
 	URL      string `bson:"url" json:"url"`           // URL to the video
 	Type     string `bson:"type" json:"type"`         // direct, hls, dash, embed
-	Provider string `bson:"provider" json:"provider"` // local, url, youtube, vimeo, s3, r2
+	Provider string `bson:"provider" json:"provider"` // local, url, youtube, vidsrc, 2embed
+	Quality  string `bson:"quality" json:"quality"`   // 1080p, 720p, etc.
 }
 
 type Movie struct {
 	ID            bson.ObjectID    `bson:"_id,omitempty" json:"_id,omitempty"`
+	TMDbID        int              `bson:"tmdbId" json:"tmdbId"`
 	Title         string           `bson:"title" json:"title"`
 	ShortDesc     string           `bson:"shortDesc" json:"shortDesc"`
 	Description   string           `bson:"description" json:"description"`
@@ -102,6 +105,7 @@ type Movie struct {
 	IsTrending    bool             `bson:"isTrending" json:"isTrending"`
 	IsFeatured    bool             `bson:"isFeatured" json:"isFeatured"`
 	IsTvShow      bool             `bson:"isTvShow" json:"isTvShow"`
+	IsPublished   bool             `bson:"isPublished" json:"isPublished"`
 	Seasons       []Season         `bson:"seasons" json:"seasons"`
 	NotifyUsers   []bson.ObjectID  `bson:"notifyUsers" json:"notifyUsers"`
 	ContentRating string           `bson:"contentRating" json:"contentRating"` // Deprecated but kept for compat
